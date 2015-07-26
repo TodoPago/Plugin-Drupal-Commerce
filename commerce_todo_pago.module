@@ -1,0 +1,654 @@
+<?php
+include(drupal_get_path('module', 'commerce_todo_pago').'/includes/commerce_todo_pago_general.php');
+function logModule($mensaje)
+{
+	$nombre = 'log';
+	
+	$archivo = fopen(dirname(__FILE__).'/'.$nombre.'.txt', 'a+');
+	fwrite($archivo, date('Y/m/d - H:i:s').' - '.$mensaje . PHP_EOL);
+	fclose($archivo);
+}
+
+function logInfo($order, $action, $params = false)
+{
+	$log = 'TodoPago - Orden: ' . $order . ' - ' . $action;
+	if($params) $log = $log . ' - Parametros: ' .json_encode($params);
+	logModule($log);
+}
+
+function commerce_todo_pago_block_view(){ 
+  global $base_path;
+  drupal_add_js($base_path.drupal_get_path('module', 'commerce_todo_pago') .'/includes/todopago.js', array("type"=>"file","requires_jquery"=> TRUE));
+}
+
+function commerce_todo_pago_form_alter(&$form, $form_state, $form_id) {
+  if($form_id == 'commerce_checkout_form_checkout'){
+    drupal_add_js($base_path.drupal_get_path('module', 'commerce_todo_pago') .'/includes/jquery.min.js', array("type"=>"file"));
+    commerce_todo_pago_block_view();
+  } 
+}
+
+
+function commerce_todo_pago_commerce_payment_method_info() {
+    
+  $payment_methods = array();
+
+  $payment_methods['bank_transfer'] = array(
+    'base' => 'commerce_todo_pago',
+    'title' => t('Todo Pago'),
+    'description' => t('Metodo de Pago Todo Pago'),
+	 'active' => TRUE,
+    'terminal' => FALSE,
+    'offsite' => TRUE,
+  );
+
+  return $payment_methods;
+}
+
+function commerce_todo_pago_handle_response($order,$return){
+    global $user;   
+    $ak = $_REQUEST["Answer"];
+	second_step_todopago($order, $return, $user, $ak);
+}
+
+function commerce_todo_pago_redirect_form($form, &$form_state, $order, $payment_method) {
+	return first_step_todopago($form, $form_state, $order, $payment_method);
+} 
+ 
+/**
+ * Implements hook_menu().
+ */
+ 
+function commerce_todo_pago_order_status_info() {
+
+
+  $order_statuses = array();
+
+  $order_statuses['completed'] = array(
+    'name' => 'completed', 
+    'title' => t('Completed'), 
+    'state' => 'completed',
+  );
+
+  return $order_statuses;
+} 
+ 
+function commerce_todo_pago_menu() {
+  $items = array();
+ 
+   $items['commerce/todopago/notification'] = array(
+      'title' => 'todopago response', 
+      'page callback' => 'commerce_todo_pago_handle_response',   
+      'access arguments' => array('access checkout'),
+      'type' => MENU_CALLBACK,
+  );
+
+  $items['admin/commerce/config/todopago'] = array(
+    'title' => 'Todo Pago',
+    'description' => 'Listado de todas los pedidos',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('commerce_todo_pago_admin_form'),
+    'access arguments' => array('administer commerce_todo_pago settings'),
+    'file' => 'includes/commerce_todo_pago.admin.inc',
+    'type'  => MENU_NORMAL_ITEM,
+  );
+  
+   $items['admin/commerce/orders/%commerce_order/todo_pago'] = array(
+    'title' => 'Todo Pago Status',
+    'page callback' => 'drupal_get_form',
+    
+  'page arguments' => array('commerce_todo_pago_admin_form',3,3),
+    'access arguments' => array(3,4),
+    'type' => MENU_DEFAULT_LOCAL_TASK,
+    'context' => MENU_CONTEXT_INLINE,
+    'weight' => 2,
+    'file' => 'includes/commerce_todo_pago.admin.inc',
+  );
+  
+
+  return $items;
+}
+
+
+function commerce_todo_pago_enable(){
+    commerce_todo_pago_add_checkout_fields();
+    commerce_todo_pago_add_product_fields();
+	commerce_todo_pago_database();
+    
+} 
+
+function commerce_todo_pago_database() {
+	$res = db_query("CREATE TABLE IF NOT  EXISTS `{todopago_transaccion}` (
+					   `id` INT NOT NULL AUTO_INCREMENT,
+					   `id_orden` INT NULL,
+					   `first_step` TIMESTAMP NULL,
+					   `params_SAR` TEXT NULL,
+					   `response_SAR` TEXT NULL,
+					   `second_step` TIMESTAMP NULL,
+					   `params_GAA` TEXT NULL,
+					   `response_GAA` TEXT NULL,
+					   `request_key` TEXT NULL,
+					   `public_request_key` TEXT NULL,
+					   `answer_key` TEXT NULL,
+					   PRIMARY KEY (`id`)
+	   );");
+}
+
+function commerce_todo_pago_add_product_fields(){
+    
+  commerce_todo_pago_admin_create_instance('csitproductcode', 'list_text', FALSE, 'commerce_product', 'product', t('Tipo de Producto'),NULL,0,array("adult_content"=>"adult_content","coupon"=>"coupon","default"=>"default","electronic_good"=>"electronic_good","electronic_software"=>"electronic_software"  ,"gift_certificate"=>"gift_certificate","handling_only"=>"handling_only","service"=>"service","shipping_and_handling"=>"shipping_and_handling","shipping_only" =>"shipping_only" ,"subscription"=>"subscription"));
+  commerce_todo_pago_admin_create_instance('csmdd34', 'list_text', FALSE, 'commerce_product', 'product', t('Tipo de Envio'),NULL,0,array("Pickup"=>"Pickup","Email"=>"Email","Smartphone"=>"Smartphone","Other"=>"Other"));
+  commerce_todo_pago_admin_create_instance('csmdd28', 'list_text', FALSE, 'commerce_product', 'product', t('Tipo de Servicio'),NULL,0,array("Luz"=>"Luz","Gas"=>"Gas","Agua"=>"Agua","TV"=>"TV","Cable"=>"Cable","Internet"=>"Internet","Impuestos"=>"Impuestos"));
+  commerce_todo_pago_admin_create_instance('csmdd31', 'list_text', FALSE, 'commerce_product', 'product', t('Tipo de delivery'),NULL,0,array("WEB Session"=>"WEB Session","Email"=>"Email","SmartPhone"=>"SmartPhone"));
+  commerce_todo_pago_admin_create_instance('csmdd33', 'text', FALSE, 'commerce_product', 'product', t('Dias para el Evento'));
+    
+
+
+}
+function commerce_todo_pago_add_checkout_fields() {
+
+  $field = field_info_field("todo_pago_telefono");
+  $instance = field_info_instance('commerce_customer_profile', "todo_pago_telefono", 'billing');
+
+  if (empty($field)) {
+    $field = array(
+      'field_name' => "todo_pago_telefono",
+      'type' => 'text',
+      'cardinality' => 1,
+      'entity_types' => array('commerce_customer_profile'),
+      'translatable' => FALSE,
+      'locked' => FALSE,
+    );
+
+    $field = field_create_field($field);
+  }
+
+  if (empty($instance)) {
+    $instance = array(
+      'field_name' => "todo_pago_telefono",
+      'entity_type' => 'commerce_customer_profile',
+      'bundle' => 'billing',
+      'label' => t('Numero de Telefono'),
+      'required' => TRUE,
+      'widget' => array(
+        'type' => 'text_textfield',
+      ),
+      'settings' => array(),
+      'display' => array(),
+    );
+
+
+    foreach (array('default', 'customer', 'administrator') as $view_mode) {
+      $instance['display'][$view_mode] = array(
+        'label' => 'hidden',
+        'type' => 'text_default',
+        'weight' => -10,
+      );
+    }
+
+    field_create_instance($instance);
+    
+    }
+    
+    /*********************************************/
+    
+    $field = field_info_field("todo_pago_ciudad");
+  $instance = field_info_instance('commerce_customer_profile', "todo_pago_ciudad", 'billing');
+
+  if (empty($field)) {
+    $field = array(
+      'field_name' => "todo_pago_ciudad",
+      'type' => 'list_text',
+      'settings' => array(
+          'allowed_values'=> array('C' => 'CABA',
+                            'B'  => 'Buenos Aires',
+                            'K'  => 'Catamarca',
+                            'H'  => 'Chaco' ,
+                            'U'  => 'Chubut',
+                            'X'  => 'Cordoba',
+                            'W'  => 'Corrientes',
+                            'R'  => 'Entre Rios',
+                            'P'  => 'Formosa',
+                            'Y'  => 'Jujuy',
+                            'L'  => 'La Pampa',
+                            'F' =>  'La Rioja',
+                            'M' => 'Mendoza',
+                            'N'  => 'Misiones',
+                            'Q'  => 'Neuquen',
+                            'R'  => 'Rio Negro',
+                            'A'  => 'Salta',
+                            'J'  => 'San Juan',
+                            'D'  => 'San Luis',
+                            'Z'  => 'Santa Cruz',
+                            'S' =>   'Santa Fe',
+                            'G'  => 'Santiago del Estero',
+                            'V'  => 'Tierra del Fuego',
+                            'T'  => 'Tucuman')         
+          ),
+      
+      'cardinality' => 1,
+      'entity_types' => array('commerce_customer_profile'),
+      'translatable' => FALSE,
+      'locked' => FALSE,
+    );
+       $field = field_create_field($field);
+  }
+
+  if (empty($instance)) {
+    $instance = array(
+      'field_name' => "todo_pago_ciudad",
+      'entity_type' => 'commerce_customer_profile',
+      'bundle' => 'billing',
+      'label' => t('Provincia'),
+      'required' => TRUE,
+      'widget' => array(
+        'type' => 'options_select',
+      ),
+      'settings' => array(),
+      'display' => array(),
+    );
+
+
+    foreach (array('default', 'customer', 'administrator') as $view_mode) {
+      $instance['display'][$view_mode] = array(
+        'label' => 'hidden',
+        'type' => 'options_select',
+        'weight' => -10,
+      );
+    }
+
+    field_create_instance($instance);
+    
+    
+    
+   
+    
+    
+  }
+  
+  /*********************************************/
+  
+    $field = field_info_field("todo_pago_apellido");
+  $instance = field_info_instance('commerce_customer_profile', "todo_pago_apellido", 'billing');
+
+  if (empty($field)) {
+    $field = array(
+      'field_name' => "todo_pago_apellido",
+      'type' => 'text',
+      'cardinality' => 1,
+      'entity_types' => array('commerce_customer_profile'),
+      'translatable' => FALSE,
+      'locked' => FALSE,
+    );
+
+    $field = field_create_field($field);
+  }
+
+  if (empty($instance)) {
+    $instance = array(
+      'field_name' => "todo_pago_apellido",
+      'entity_type' => 'commerce_customer_profile',
+      'bundle' => 'billing',
+      'label' => t('Apellido'),
+      'required' => TRUE,
+      'widget' => array(
+        'type' => 'text_textfield',
+      ),
+      'settings' => array(),
+      'display' => array(),
+    );
+
+   
+    foreach (array('default', 'customer', 'administrator') as $view_mode) {
+      $instance['display'][$view_mode] = array(
+        'label' => 'hidden',
+        'type' => 'text_default',
+        'weight' => -10,
+      );
+    }
+
+    field_create_instance($instance);
+    
+    }
+    
+  
+  
+    $field = field_info_field("todo_pago_nombre");
+  $instance = field_info_instance('commerce_customer_profile', "todo_pago_nombre", 'billing');
+
+  if (empty($field)) {
+    $field = array(
+      'field_name' => "todo_pago_nombre",
+      'type' => 'text',
+      'cardinality' => 1,
+      'entity_types' => array('commerce_customer_profile'),
+      'translatable' => FALSE,
+      'locked' => FALSE,
+    );
+
+    $field = field_create_field($field);
+  }
+
+  if (empty($instance)) {
+    $instance = array(
+      'field_name' => "todo_pago_nombre",
+      'entity_type' => 'commerce_customer_profile',
+      'bundle' => 'billing',
+      'label' => t('Nombre'),
+      'required' => TRUE,
+      'widget' => array(
+        'type' => 'text_textfield',
+      ),
+      'settings' => array(),
+      'display' => array(),
+    );
+
+  
+    foreach (array('default', 'customer', 'administrator') as $view_mode) {
+      $instance['display'][$view_mode] = array(
+        'label' => 'hidden',
+        'type' => 'text_default',
+        'weight' => -10,
+      );
+    }
+
+    field_create_instance($instance);
+    
+    }
+    
+}
+
+function commerce_todo_pago_views_pre_render(&$view) {
+
+   $view=array();
+ }
+
+
+ function commerce_todo_pago_handle_users_view($user,$order){
+    
+ 
+   return true;
+    
+ }
+function commerce_todo_pago_transaction_confirm_access($order, $transaction = NULL, $account = NULL) {
+  $access = commerce_payment_transaction_access('update', $transaction, $account);
+  if ($access && $transaction) {
+    if ($transaction->payment_method != 'todo_pago') {
+      $access = FALSE;
+    }
+    else if ($transaction->status == COMMERCE_PAYMENT_STATUS_SUCCESS) {
+      $access = FALSE;
+    }
+  }
+  return $access;
+}
+
+
+function commerce_todo_pago_settings_form($settings = NULL) {
+
+  $form = array();
+
+  $settings = (array) $settings + array(
+    'commerce_todo_pago_bank_code_appellation' => 'Bank code',
+    'commerce_todo_pago_subject_oid' => FALSE,
+  );
+
+
+  
+
+  $form['commerce_todo_pago_help_text'] = array(
+    '#markup' => '<div class="help">' . t('<p><strong>v1.0.0</strong></p><h4><strong>Instrucciones de uso</strong></h4><p>Complete los campos con los valores provistos por Todo Pago</p>') . '</div>', 
+  );
+
+  $form['general'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('GENERAL'),
+    '#collapsible' => TRUE,
+    '#collapsed' => FALSE,
+  );
+  $form['general']['enabled'] = array(
+    '#type' => 'select',
+    '#title' => t('Account owner'),
+	'#options' => array(
+          1 => t('Habilitado'),
+         0 => t('Deshabilitado'),
+       ),
+    '#description' => t('Habilitado.'),
+    '#default_value' => isset($settings['general']['enabled']) ? $settings['general']['enabled'] : '0', 
+    '#required' => FALSE,
+  );
+  
+  $form['general']['authorization'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Authorization HTTP'),
+	'#description'=>t('se deben para datos en formato json. ejemplo: { "Authorization":"PRISMA 912EC803B2CE49E4A541068D495AB570"}'),
+    '#default_value' => isset($settings['general']['authorization']) ? $settings['general']['authorization'] : '',
+    '#required' => FALSE,
+	'#maxlength'=>500
+  );
+   
+  
+    $form['general']['segmento'] = array(
+    '#type' => 'select',
+	'#options' => array(
+          'Retail' => t('Retail'),
+         'Ticketing' => t('Ticketing'),
+         'Services' => t('Services'),
+         'Digital_Goods' => t('Digital Goods'),
+       ),
+    '#title' => t('Segmento del Comercio'),
+	'#description'=>t('La elección del segmento determina los tipos de datos a enviar'),
+    '#default_value' => isset($settings['general']['segmento']) ? $settings['general']['segmento'] : 'Retail',
+    '#required' => FALSE,
+  );
+
+  $form['general']['modo'] = array(
+    '#type' => 'select',
+	'#options' => array(
+          'Test' => t('Developers'),
+         'Produccion' => t('Produccion'),
+      ),
+    '#title' => t('Ambiente Developers o Producción'),
+	'#description'=>t('Debe ser cofigurado en CONFIGURACION - AMBIENTE DEVELOPERS / PRODUCCION'),
+    '#default_value' => isset($settings['general']['modo']) ? $settings['general']['modo'] : 'Test',
+    '#required' => FALSE,
+  );
+  
+   $form['general']['deadline'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Dead Line'),
+	'#description'=>t('días máximos para la entrega'),
+    '#default_value' => isset($settings['general']['deadline']) ? $settings['general']['deadline'] : '',
+    '#required' => FALSE,
+  );
+  
+   $form['ambientetest'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('AMBIENTE DEVELOPERS'),
+    '#collapsible' => TRUE,
+    '#collapsed' => FALSE,
+  ); 
+  
+      $form['ambientetest']['idsite'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Id Site Todo Pago'),
+	'#description'=>t('Número de Comercio provisto por Todo Pago'),
+    '#default_value' => isset($settings['ambientetest']['idsite']) ? $settings['ambientetest']['idsite'] : '',
+    '#required' => FALSE,
+  );
+  
+  
+      $form['ambientetest']['security'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Security code'),
+	'#description'=>t('Código provisto por Todo Pago'),
+    '#default_value' => isset($settings['ambientetest']['security']) ? $settings['ambientetest']['security'] : '',
+    '#required' => FALSE,
+  );
+  
+     $form['ambienteproduccion'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('AMBIENTE PRODUCCION'),
+    '#collapsible' => TRUE,
+    '#collapsed' => FALSE,
+  );
+  
+      $form['ambienteproduccion']['idsite'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Id Site Todo Pago'),
+	'#description'=>t('Número de Comercio provisto por Todo Pago'),
+    '#default_value' => isset($settings['ambienteproduccion']['idsite']) ? $settings['ambienteproduccion']['idsite'] : '',
+    '#required' => FALSE,
+  );
+  
+  
+      $form['ambienteproduccion']['security'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Security code'),
+	'#description'=>t('Código provisto por Todo Pago'),
+    '#default_value' => isset($settings['ambienteproduccion']['security']) ? $settings['ambienteproduccion']['security'] : '',
+    '#required' => FALSE,
+  );
+  
+  
+    $order_statuses = module_invoke_all('commerce_order_status_info');
+	
+	
+	
+	  $form['status'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('ESTADOS DEL PEDIDO'),
+    '#collapsible' => TRUE,
+    '#collapsed' => FALSE,
+  );
+  
+   foreach (commerce_order_state_get_title() as $name => $title) {
+    foreach (commerce_order_statuses(array('state' => $name)) as $order_status) {
+      $options[check_plain($title)][$order_status['name']] = check_plain($order_status['title']);
+    }
+  }
+  
+      $form['status']['start'] = array(
+    '#type' => 'select',
+	'#options' => $options,
+    '#title' => t('Estado cuando la transaccion ha sido iniciada'),
+
+    '#default_value' => isset($settings['status']['start']) ? $settings['status']['start'] : '',
+    '#required' => FALSE,
+  );
+
+      $form['status']['aprobada'] = array(
+    '#type' => 'select',
+	'#options' => $options,
+    '#title' => t('Estado cuando la transaccion ha sido aprobada'),
+
+    '#default_value' => isset($settings['status']['aprobada']) ? $settings['status']['aprobada'] : '',
+    '#required' => FALSE,
+  );
+  
+      $form['status']['rechazada'] = array(
+    '#type' => 'select',
+	'#options' => $options,
+    '#title' => t('Estado cuando la transaccion ha sido Rechazada'),
+
+    '#default_value' => isset($settings['status']['rechazada']) ? $settings['status']['rechazada'] : '',
+    '#required' => FALSE,
+  );
+  
+      $form['status']['offline'] = array(
+    '#type' => 'select',
+	'#options' => $options,
+    '#title' => t('Estado cuando la transaccion ha sido Offline'),
+
+    '#default_value' => isset($settings['status']['offline']) ? $settings['status']['offline'] : '',
+    '#required' => FALSE,
+  );
+  
+  return $form;
+}
+
+/**
+ * Payment method callback: checkout form.
+ */
+function commerce_todo_pago_submit_form($payment_method, $pane_values, $checkout_pane, $order) {
+	
+  $form = array();
+
+  
+  if (!empty($order->data['bank_transfer'])) {
+    $pane_values += $order->data['bank_transfer'];
+  }
+
+  global $base_path;
+  $form['bank_details'] = array(
+ 
+    '#markup' => '<p><img src="'.$base_path.drupal_get_path('module', 'commerce_todo_pago').'/images/todopago.jpg">',
+ );
+
+  return $form;
+}
+
+
+
+
+
+
+
+function commerce_todo_pago_admin_create_instance($field_name, $field_type, $required, $entity_type, $bundle, $label, $description = NULL, $weight = 0,$allow=array()) {
+
+  $field = field_info_field($field_name);
+  $instance = field_info_instance($entity_type, $field_name, $bundle);
+	
+  if (empty($field)) {
+    $field = array(
+      'field_name' => $field_name,
+      'type' => $field_type,
+      'cardinality' => 1,
+      'entity_types' => array($entity_type),
+      'translatable' => FALSE,
+      'locked' => FALSE,
+    );
+    if ($field_type == 'list_boolean') {
+      $field['settings'] = array(
+        'allowed_values' => array(0, 1),
+        'allowed_values_function' => '',
+      );
+    }
+    if ($field_type == 'list_text') {
+      $field['settings'] = array(
+        'allowed_values' => $allow,
+    
+      );
+    }
+    $field = field_create_field($field);
+  }
+  if (empty($instance)) {
+    $instance = array(
+      'field_name' => $field_name,
+      'entity_type' => $entity_type,
+      'bundle' => $bundle,
+      'label' => $label,
+      'required' => $required,
+      'settings' => array(),
+      'display' => array(
+        'default' => array('type' => 'hidden'),
+        'teaser' => array('type' => 'hidden')
+    ),
+      'description' => $description,
+      'default_value' => array(array('value' => "0")),
+    );
+
+
+
+    $entity_info = entity_get_info($entity_type);
+
+  
+    $entity_info['view modes']['default'] = array();
+
+    field_create_instance($instance);
+  }else{
+	
+  }
+}
+
+

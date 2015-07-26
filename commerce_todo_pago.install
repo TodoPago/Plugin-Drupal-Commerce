@@ -1,0 +1,13 @@
+<?php
+
+/**
+ * bank transfer cleanup database on uninstall
+ */
+function commerce_todo_pago_uninstall() {
+/*  db_delete('variable')
+    ->condition('name', 'commerce_todo_pago_%', 'LIKE')
+    ->execute(); */
+}
+
+
+

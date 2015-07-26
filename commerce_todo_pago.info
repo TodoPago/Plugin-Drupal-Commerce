@@ -1,0 +1,22 @@
+name = Commerce Todo Pago
+description = Provee un metodo de pago de TODO PAGO para Drupal Commerce.
+package = Commerce (contrib)
+dependencies[] = commerce
+dependencies[] = commerce_ui
+dependencies[] = commerce_payment
+dependencies[] = commerce_order
+core = 7.x
+
+; Includes
+; files[] = includes/commerce_todo_pago.admin.inc
+
+; Simple tests
+; files[] = tests/commerce_todo_pago.test
+
+
+; Information added by drupal.org packaging script on 2012-03-24
+version = "1.0.0"
+core = "7.x"
+project = "commerce_todo_pago"
+datestamp = "1332606952"
+
