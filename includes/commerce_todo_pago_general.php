@@ -2,6 +2,7 @@
 use TodoPago\Sdk;
 
 include_once(drupal_get_path('module', 'commerce_todo_pago').'/includes/TodoPago/lib/Sdk.php');
+include_once(drupal_get_path('module', 'commerce_todo_pago').'/includes/ControlFraude/ControlFraudeFactory.php');
 
 function _phoneSanitize($number){
 	$number = str_replace(array(" ","(",")","-","+"),"",$number);
@@ -63,508 +64,29 @@ function first_step_todopago($form, &$form_state, $order, $payment_method)
 	
 	if(_tranEstado($order->order_id) == 0) 
 		_tranCrear($order->order_id);
-			
-    $profile = commerce_customer_profile_load($order->commerce_customer_billing[LANGUAGE_NONE][0]['profile_id']);
-    
-    $form['CSBTCITY'] = array(
-			'#type' => 'hidden',
-			'#value' => $profile->commerce_customer_address[LANGUAGE_NONE][0]["locality"],
-	);
-    $form['CSBTCOUNTRY'] = array(
-			'#type' => 'hidden',
-			'#value' => $profile->commerce_customer_address[LANGUAGE_NONE][0]["country"],
-	);
-    $form['CSBTCUSTOMERID'] = array(
-			'#type' => 'hidden',
-			'#value' => $profile->uid,
-	);
-      $form['CSBTIPADDRESS'] = array(
-			'#type' => 'hidden',
-			'#value' => $user->hostname,
-	);
-      $form['CSBTEMAIL'] = array(
-			'#type' => 'hidden',
-			'#value' =>  $order->mail,
-	);
-                     
-      $form['CSBTFIRSTNAME'] = array(
-			'#type' => 'hidden',
-			'#value' =>  $profile->todo_pago_nombre[LANGUAGE_NONE][0]["value"],
-	);
-                     
-    $form['CSBTLASTNAME'] = array(
-			'#type' => 'hidden',
-			'#value' =>  $profile->todo_pago_apellido[LANGUAGE_NONE][0]["value"],
-	);
-    $form['CSBTPHONENUMBER'] = array(
-			'#type' => 'hidden',
-			'#value' => _phoneSanitize($profile->todo_pago_telefono[LANGUAGE_NONE][0]["value"]),
-	);
-                        
-     $form['CSBTPOSTALCODE'] = array(
-			'#type' => 'hidden',
-			'#value' => $profile->commerce_customer_address[LANGUAGE_NONE][0]["postal_code"],
-	);    
-       
-    $form['CSBTSTATE'] = array(
-			'#type' => 'hidden',
-			'#value' =>  $profile->todo_pago_ciudad[LANGUAGE_NONE][0]["value"],
-	);
-    $form['CSBTSTREET1'] = array(
-			'#type' => 'hidden',
-			'#value' => $profile->commerce_customer_address[LANGUAGE_NONE][0]["thoroughfare"],
-	);          
-    $form['CSPTCURRENCY'] = array(
-			'#type' => 'hidden',
-			'#value' => "ARS", 
-	);       
-     $form['CSPTGRANDTOTALAMOUNT'] = array(
-			'#type' => 'hidden',
-			'#value' => number_format(commerce_currency_amount_to_decimal($order->commerce_order_total[LANGUAGE_NONE][0]["amount"],$order->commerce_order_total[LANGUAGE_NONE][0]["currency_code"]),2,".",""),
-	);           
-    if (isset($user->created)){
-        $dias = $user->timestamp - $user->created;
-        $dias = $dias / 60 / 60 / 24;
-        $dias = round($dias);
-         $form['CSMDD7'] = array(
-			'#type' => 'hidden',
-			'#value' => $dias,
-        	); 
-           $form['CSMDD8'] = array(
-			'#type' => 'hidden',
-			'#value' => "N",
-        	);  
-              $form['CSMDD9'] = array(
-			'#type' => 'hidden',
-			'#value' => $user->pass,
-        	);   
-            
-    }else{
-        
-         $form['CSMDD8'] = array(
-			'#type' => 'hidden',
-			'#value' => "S",
-        	);  
-    }
-    
-    /******** RETAIL ********/
-    if ($payment_method["settings"]["general"]["segmento"] == "Retail"){
-       
-           $form['CSSTCITY'] = array(
-			'#type' => 'hidden',
-			'#value' => $profile->commerce_customer_address[LANGUAGE_NONE][0]["locality"],
-	);
-        $form['CSSTCOUNTRY'] = array(
-			'#type' => 'hidden',
-			'#value' => $profile->commerce_customer_address[LANGUAGE_NONE][0]["country"],
-	);
-        $form['CSSTEMAIL'] = array(
-			'#type' => 'hidden',
-			'#value' =>  $order->mail,
-	);
-            
-     $form['CSSTFIRSTNAME'] = array(
-			'#type' => 'hidden',
-			'#value' =>  $profile->todo_pago_nombre[LANGUAGE_NONE][0]["value"],
-	);
-                     
-    $form['CSSTLASTNAME'] = array(
-			'#type' => 'hidden',
-			'#value' =>  $profile->todo_pago_apellido[LANGUAGE_NONE][0]["value"],
-	);
-    $form['CSSTPHONENUMBER'] = array(
-			'#type' => 'hidden',
-			'#value' => _phoneSanitize($profile->todo_pago_telefono[LANGUAGE_NONE][0]["value"]),
-	);
-    
-    
-      $form['CSSTPOSTALCODE'] = array(
-			'#type' => 'hidden',
-			'#value' => $profile->commerce_customer_address[LANGUAGE_NONE][0]["postal_code"],
-	);    
-       
-    $form['CSSTSTATE'] = array(
-			'#type' => 'hidden',
-			'#value' =>  $profile->todo_pago_ciudad[LANGUAGE_NONE][0]["value"],
-	);
-    $form['CSSTSTREET1'] = array(
-			'#type' => 'hidden',
-			'#value' => $profile->commerce_customer_address[LANGUAGE_NONE][0]["thoroughfare"],
-	);        
-    
-     $order_lines = field_get_items('commerce_order', $order, 'commerce_line_items');
- 
-  $line_item_ids = array();
-  foreach ($order_lines as $order_line) {
-    $line_item_ids[] = $order_line['line_item_id'];
-  }
- 
-
-  $line_items = commerce_line_item_load_multiple($line_item_ids);
- 
-  
-  $product_ids = array();
-  $cant_prod = array();
-  foreach ($line_items as $line_item) {
-  
-   
-    $tmp = field_get_items('commerce_line_item', $line_item, 'commerce_product');
-   
-    
-  
-     
-    $cant_prod[$tmp[0]['product_id']] = round($line_item->quantity);
-     $product_ids[] = $tmp[0]['product_id'];    
-    
-    
-  }
- 
-    $products = commerce_product_load_multiple($product_ids);
- 
-  $CSITPRODUCTCODE = "";
-  $CSITPRODUCTDESCRIPTION = "";
-  $CSITPRODUCTNAME ="";
-  $CSITPRODUCTSKU = "";
-  $CSITQUANTITY ="";
-  $CSITUNITPRICE ="";
-  $CSITTOTALAMOUNT ="";
-    foreach($products as $producto){
-		if(property_exists($producto,"csitproductcode"))  $CSITPRODUCTCODE .= $producto->csitproductcode[LANGUAGE_NONE][0]["value"]."#";
-        else  $CSITPRODUCTCODE .= "default#";
-
-        $CSITPRODUCTDESCRIPTION .= substr(Sdk::sanitizeValue($producto->title),0,17)."#";
-        $CSITPRODUCTNAME .= $producto->title."#";
-        $CSITPRODUCTSKU .= $producto->sku."#";
-        
-        $CSITQUANTITY .=$cant_prod[$producto->product_id]."#";
-        $CSITUNITPRICE .= commerce_currency_amount_to_decimal($producto->commerce_price[LANGUAGE_NONE][0]["amount"],$producto->commerce_price[LANGUAGE_NONE][0]["currency_code"])."#";
-      
-        $CSITTOTALAMOUNT .= $cant_prod[$producto->product_id] * commerce_currency_amount_to_decimal($producto->commerce_price[LANGUAGE_NONE][0]["amount"],$producto->commerce_price[LANGUAGE_NONE][0]["currency_code"])."#";
-    }
-    
-     $form['CSITPRODUCTCODE'] = array(
-			'#type' => 'hidden',
-			'#value' =>  trim($CSITPRODUCTCODE,"#")
-	);
-     $form['CSITPRODUCTDESCRIPTION'] = array(
-			'#type' => 'hidden',
-			'#value' =>  trim($CSITPRODUCTDESCRIPTION,"#")
-	);
-     $form['CSITPRODUCTNAME'] = array(
-			'#type' => 'hidden',
-			'#value' =>  trim($CSITPRODUCTNAME,"#")
-	);
-     $form['CSITPRODUCTSKU'] = array(
-			'#type' => 'hidden',
-			'#value' =>  trim($CSITPRODUCTSKU,"#")
-	);
-     $form['CSITQUANTITY'] = array(
-			'#type' => 'hidden',
-			'#value' =>  trim($CSITQUANTITY,"#")
-	);
-     $form['CSITUNITPRICE'] = array(
-			'#type' => 'hidden',
-			'#value' =>  trim(number_format($CSITUNITPRICE,2,".",""),"#")
-	);
-     $form['CSITTOTALAMOUNT'] = array(
-			'#type' => 'hidden',
-			'#value' =>  trim(number_format($CSITTOTALAMOUNT,2,".",""),"#")
-	);
-    }
-    
- 
-    /******** Ticketing ********/
-    if ($payment_method["settings"]["general"]["segmento"] == "Ticketing"){
-       
-    
-    
-     $order_lines = field_get_items('commerce_order', $order, 'commerce_line_items');
- 
-  $line_item_ids = array();
-  foreach ($order_lines as $order_line) {
-    $line_item_ids[] = $order_line['line_item_id'];
-  }
- 
-
-  $line_items = commerce_line_item_load_multiple($line_item_ids);
- 
-  
-  $product_ids = array();
-  $cant_prod = array();
-  foreach ($line_items as $line_item) {
-  
-   
-    $tmp = field_get_items('commerce_line_item', $line_item, 'commerce_product');
-   
-    
-  
-     
-    $cant_prod[$tmp[0]['product_id']] = round($line_item->quantity);
-     $product_ids[] = $tmp[0]['product_id'];    
-    
-    
-  }
- 
-  
-  $products = commerce_product_load_multiple($product_ids);
- 
-  $CSMDD33= "";
-  $CSMDD34 = "";
-  $CSITPRODUCTCODE = "";
-  $CSITPRODUCTDESCRIPTION = "";
-  $CSITPRODUCTNAME ="";
-  $CSITPRODUCTSKU = "";
-  $CSITQUANTITY ="";
-  $CSITUNITPRICE ="";
-  $CSITTOTALAMOUNT ="";
-    foreach($products as $producto){
-         $CSMDD33 .= $producto->csmdd33[LANGUAGE_NONE][0]["value"]."#";
-          $CSMDD34 .= $producto->csmdd34[LANGUAGE_NONE][0]["value"]."#";
-        $CSITPRODUCTCODE .= $producto->csitproductcode[LANGUAGE_NONE][0]["value"]."#";
-        $CSITPRODUCTDESCRIPTION .= trim(urlencode(htmlentities(strip_tags($producto->title))))."#";
-        $CSITPRODUCTNAME .= trim(urlencode(htmlentities(strip_tags($producto->title))))."#";
-        $CSITPRODUCTSKU .= trim(urlencode(htmlentities(strip_tags($producto->sku))))."#";
-        
-        $CSITQUANTITY .=$cant_prod[$producto->product_id]."#";
-        $CSITUNITPRICE .= commerce_currency_amount_to_decimal($producto->commerce_price[LANGUAGE_NONE][0]["amount"],$producto->commerce_price[LANGUAGE_NONE][0]["currency_code"])."#";
-      
-        $CSITTOTALAMOUNT .= $cant_prod[$producto->product_id] * commerce_currency_amount_to_decimal($producto->commerce_price[LANGUAGE_NONE][0]["amount"],$producto->commerce_price[LANGUAGE_NONE][0]["currency_code"])."#";
-    }
-    
-     $form['CSITPRODUCTCODE'] = array(
-			'#type' => 'hidden',
-			'#value' =>  trim($CSITPRODUCTCODE,"#")
-	);
-     $form['SITPRODUCTDESCRIPTION'] = array(
-			'#type' => 'hidden',
-			'#value' =>  trim($CSITPRODUCTDESCRIPTION,"#")
-	);
-     $form['CSITPRODUCTNAME'] = array(
-			'#type' => 'hidden',
-			'#value' =>  trim($CSITPRODUCTNAME,"#")
-	);
-     $form['CSITPRODUCTSKU'] = array(
-			'#type' => 'hidden',
-			'#value' =>  trim($CSITPRODUCTSKU,"#")
-	);
-     $form['CSITQUANTITY'] = array(
-			'#type' => 'hidden',
-			'#value' =>  trim($CSITQUANTITY,"#")
-	);
-     $form['CSITUNITPRICE'] = array(
-			'#type' => 'hidden',
-			'#value' =>  trim($CSITUNITPRICE,"#")
-	);
-     $form['CSITTOTALAMOUNT'] = array(
-			'#type' => 'hidden',
-			'#value' =>  trim($CSITTOTALAMOUNT,"#")
-	);
-        $form['CSMDD33'] = array(
-			'#type' => 'hidden',
-			'#value' =>  trim($CSMDD33,"#")
-	);
-         $form['CSMDD34'] = array(
-			'#type' => 'hidden',
-			'#value' =>  trim($CSMDD34,"#")
-	);
- 
-  
-    }
-     
-    /******** Servicios ********/
-    if ($payment_method["settings"]["general"]["segmento"] == "Services"){
-       
-    
-    
-     $order_lines = field_get_items('commerce_order', $order, 'commerce_line_items');
- 
-  $line_item_ids = array();
-  foreach ($order_lines as $order_line) {
-    $line_item_ids[] = $order_line['line_item_id'];
-  }
- 
-
-  $line_items = commerce_line_item_load_multiple($line_item_ids);
- 
-  
-  $product_ids = array();
-  $cant_prod = array();
-  foreach ($line_items as $line_item) {
-  
-   
-    $tmp = field_get_items('commerce_line_item', $line_item, 'commerce_product');
-   
-    
-  
-     
-    $cant_prod[$tmp[0]['product_id']] = round($line_item->quantity);
-     $product_ids[] = $tmp[0]['product_id'];    
-    
-    
-  }
- 
- 
-  $products = commerce_product_load_multiple($product_ids);
-
- 
-  $CSMDD28 = "";
-  $CSITPRODUCTCODE = "";
-  $CSITPRODUCTDESCRIPTION = "";
-  $CSITPRODUCTNAME ="";
-  $CSITPRODUCTSKU = "";
-  $CSITQUANTITY ="";
-  $CSITUNITPRICE ="";
-  $CSITTOTALAMOUNT ="";
-    foreach($products as $producto){
-         $CSMDD28 .= $producto->csmdd28[LANGUAGE_NONE][0]["value"]."#";
-        
-        $CSITPRODUCTCODE .= $producto->csitproductcode[LANGUAGE_NONE][0]["value"]."#";
-        $CSITPRODUCTDESCRIPTION .= trim(urlencode(htmlentities(strip_tags($producto->title))))."#";
-        $CSITPRODUCTNAME .= trim(urlencode(htmlentities(strip_tags($producto->title))))."#";
-        $CSITPRODUCTSKU .= trim(urlencode(htmlentities(strip_tags($producto->sku))))."#";
-        
-        $CSITQUANTITY .=$cant_prod[$producto->product_id]."#";
-        $CSITUNITPRICE .= commerce_currency_amount_to_decimal($producto->commerce_price[LANGUAGE_NONE][0]["amount"],$producto->commerce_price[LANGUAGE_NONE][0]["currency_code"])."#";
-      
-        $CSITTOTALAMOUNT .= $cant_prod[$producto->product_id] * commerce_currency_amount_to_decimal($producto->commerce_price[LANGUAGE_NONE][0]["amount"],$producto->commerce_price[LANGUAGE_NONE][0]["currency_code"])."#";
-    }
-    
-     $form['CSITPRODUCTCODE'] = array(
-			'#type' => 'hidden',
-			'#value' =>  trim($CSITPRODUCTCODE,"#")
-	);
-     $form['SITPRODUCTDESCRIPTION'] = array(
-			'#type' => 'hidden',
-			'#value' =>  trim($CSITPRODUCTDESCRIPTION,"#")
-	);
-     $form['CSITPRODUCTNAME'] = array(
-			'#type' => 'hidden',
-			'#value' =>  trim($CSITPRODUCTNAME,"#")
-	);
-     $form['CSITPRODUCTSKU'] = array(
-			'#type' => 'hidden',
-			'#value' =>  trim($CSITPRODUCTSKU,"#")
-	);
-     $form['CSITQUANTITY'] = array(
-			'#type' => 'hidden',
-			'#value' =>  trim($CSITQUANTITY,"#")
-	);
-     $form['CSITUNITPRICE'] = array(
-			'#type' => 'hidden',
-			'#value' =>  trim($CSITUNITPRICE,"#")
-	);
-     $form['CSITTOTALAMOUNT'] = array(
-			'#type' => 'hidden',
-			'#value' =>  trim($CSITTOTALAMOUNT,"#")
-	);
-        $form['CSMDD28'] = array(
-			'#type' => 'hidden',
-			'#value' =>  trim($CSMDD28,"#")
-	);
-      
- 
-  
-    } 
-    
-    
-        /******** Digital Goods ********/
-    if ($payment_method["settings"]["general"]["segmento"] == "Digital_Goods"){
-       
-    
-    
-     $order_lines = field_get_items('commerce_order', $order, 'commerce_line_items');
- 
-  $line_item_ids = array();
-  foreach ($order_lines as $order_line) {
-    $line_item_ids[] = $order_line['line_item_id'];
-  }
- 
-
-  $line_items = commerce_line_item_load_multiple($line_item_ids);
- 
-  
-  $product_ids = array();
-  $cant_prod = array();
-  foreach ($line_items as $line_item) {
-  
-   
-    $tmp = field_get_items('commerce_line_item', $line_item, 'commerce_product');
-   
-    
-  
-     
-    $cant_prod[$tmp[0]['product_id']] = round($line_item->quantity);
-     $product_ids[] = $tmp[0]['product_id'];    
-    
-    
-  }
- 
-   $products = commerce_product_load_multiple($product_ids);
-
- 
-  $CSMDD31 = "";
-  $CSITPRODUCTCODE = "";
-  $CSITPRODUCTDESCRIPTION = "";
-  $CSITPRODUCTNAME ="";
-  $CSITPRODUCTSKU = "";
-  $CSITQUANTITY ="";
-  $CSITUNITPRICE ="";
-  $CSITTOTALAMOUNT ="";
-    foreach($products as $producto){
-         $CSMDD31 .= $producto->csmdd31[LANGUAGE_NONE][0]["value"]."#";
-        
-        $CSITPRODUCTCODE .= $producto->csitproductcode[LANGUAGE_NONE][0]["value"]."#";
-        $CSITPRODUCTDESCRIPTION .= trim(urlencode(htmlentities(strip_tags($producto->title))))."#";
-        $CSITPRODUCTNAME .= trim(urlencode(htmlentities(strip_tags($producto->title))))."#";
-        $CSITPRODUCTSKU .= trim(urlencode(htmlentities(strip_tags($producto->sku))))."#";
-        
-        $CSITQUANTITY .=$cant_prod[$producto->product_id]."#";
-        $CSITUNITPRICE .= commerce_currency_amount_to_decimal($producto->commerce_price[LANGUAGE_NONE][0]["amount"],$producto->commerce_price[LANGUAGE_NONE][0]["currency_code"])."#";
-      
-        $CSITTOTALAMOUNT .= $cant_prod[$producto->product_id] * commerce_currency_amount_to_decimal($producto->commerce_price[LANGUAGE_NONE][0]["amount"],$producto->commerce_price[LANGUAGE_NONE][0]["currency_code"])."#";
-    }
-    
-     $form['CSITPRODUCTCODE'] = array(
-			'#type' => 'hidden',
-			'#value' =>  trim($CSITPRODUCTCODE,"#")
-	);
-     $form['SITPRODUCTDESCRIPTION'] = array(
-			'#type' => 'hidden',
-			'#value' =>  trim($CSITPRODUCTDESCRIPTION,"#")
-	);
-     $form['CSITPRODUCTNAME'] = array(
-			'#type' => 'hidden',
-			'#value' =>  trim($CSITPRODUCTNAME,"#")
-	);
-     $form['CSITPRODUCTSKU'] = array(
-			'#type' => 'hidden',
-			'#value' =>  trim($CSITPRODUCTSKU,"#")
-	);
-     $form['CSITQUANTITY'] = array(
-			'#type' => 'hidden',
-			'#value' =>  trim($CSITQUANTITY,"#")
-	);
-     $form['CSITUNITPRICE'] = array(
-			'#type' => 'hidden',
-			'#value' =>  trim($CSITUNITPRICE,"#")
-	);
-     $form['CSITTOTALAMOUNT'] = array(
-			'#type' => 'hidden',
-			'#value' =>  trim($CSITTOTALAMOUNT,"#")
-	);
-        $form['CSMDD31'] = array(
-			'#type' => 'hidden',
-			'#value' =>  trim($CSMDD31,"#")
-	);
-      
- 
-  
-    } 
-    
- 
- foreach($form as $key=>$value){
-    $optionsSAR_operacion[$key] =$value["#value"];   
- }
+	
+	$vertical = $payment_method["settings"]["general"]["segmento"];
+	switch($vertical) {
+		case "Retail":
+			$vertical = ControlFraudeFactory::RETAIL;
+			break;
+		case "Ticketing":
+			$vertical = ControlFraudeFactory::TICKETING;
+			break;		
+		case "Services":
+			$vertical = ControlFraudeFactory::SERVICE;
+			break;		
+		case "Digital_Goods":
+			$vertical = ControlFraudeFactory::DIGITAL_GOODS;
+			break;		
+	}
+	$dataFraude = ControlFraudeFactory::get_controlfraude_extractor($vertical, $user, $order)->getDataCS();
+	
+	$form = array_merge($form,$dataFraude);
+	
+	 foreach($form as $key=>$value){
+		$optionsSAR_operacion[$key] =$value["#value"];   
+	 }
 
 	$monto= commerce_currency_amount_to_decimal($order->commerce_order_total[LANGUAGE_NONE][0]["amount"],$order->commerce_order_total[LANGUAGE_NONE][0]["currency_code"]);
 
@@ -595,18 +117,23 @@ function first_step_todopago($form, &$form_state, $order, $payment_method)
 	$mode = ($settings["general"]["modo"] == "Produccion")?"prod":"test";
 	//creo el conector con el valor de Authorization, la direccion de WSDL y endpoint que corresponda
 	$connector = new Sdk($http_header, $mode);
-	
-	if(_tranEstado($order->order_id) != 1)
-	{
-		throw new Exception("first_step ya realizado");
-	}	
+		
 	logInfo($order->order_id,'params SAR',array($optionsSAR_comercio, $optionsSAR_operacion));
 	$rta = $connector->sendAuthorizeRequest($optionsSAR_comercio, $optionsSAR_operacion);
 	logInfo($order->order_id,'response SAR',$rta);
 	
 	if ($rta['StatusCode']  != -1)//Si la transacción salió mal
 	{
-		throw new Exception($respuesta['StatusMessage']);
+		if(($rta['StatusCode']  == 702)&&(!property_exists($order,"first_step"))) {
+			$authorization = json_decode($settings["general"]["authorization"],1);
+			$merchant = $settings[$modo]["idsite"];
+			$security = $settings[$modo]["security"];
+			if((isset($authorization["Authorization"]))&&(!empty($merchant))&&(!empty($security))){
+				$order->first_step = true;
+				first_step_todopago($form, $form_state, $order, $payment_method);
+			}
+		}
+		throw new Exception($rta['StatusMessage']);
 	}
 
 	$now = new DateTime();
