@@ -45,17 +45,6 @@ La configuracion del Plug in esta dividido en 4 solapas desplegables (GENERAL, A
 
 [<sub>Volver a inicio</sub>](#inicio)
 <a name="tca"></a>
-## Nuevas columnas y atributos
-El plug in para lograr las nuevas funcionalidades y su persistencia dentro del framework crearán nuevos atributos para cada producto.
-
-1.	Para "Dias para el evento": debe ingresar la fecha con el siguiente formato: dd.mm.yyyy (ejemplo: 23.05.2016)
-2.	Para "Tipo de poducto" (solo para Retail): adult_content, coupon, default, electronic_good, electronic_software, gift_certificate, handling_only, service, shipping_and_handling, shipping_only o subscription.
-3.	Para "Tipo de Envio": Pick up, Email, Smartphone o Other
-4.	Para "Tipo de Servicio": Luz, Gas, Telefono, Agua, TV, Cable, Internet, Impuestos.
-5.	Para "Tipo de Delivery": WEB Session, Email o SmartPhone.
-
-<br/>
-[<sub>Volver a inicio</sub>](#inicio)
 
 <a name="cybersource"></a>
 ## Prevención de Fraude

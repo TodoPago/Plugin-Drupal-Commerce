@@ -19,8 +19,13 @@ class ControlFraudeRetail extends ControlFraude {
 	}
 
 	protected function getCategoryArray($item){
+		/*
 		if(property_exists($item,"csitproductcode"))
 			return $item->csitproductcode[LANGUAGE_NONE][0]["value"];
 		return "default";
+		*/
+		if(!empty($item->type)) 
+			return $item->type;
+		return "defualt";
 	}
 }

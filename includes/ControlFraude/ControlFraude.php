@@ -87,7 +87,7 @@ abstract class ControlFraude {
             $description[]   = $desc;
             
             $name[]  = substr($item->title,0,250);
-            $sku[]  = substr($item->sku,0,250);
+            $sku[]  = substr((empty($item->sku)?$item->product_id:$item->sku),0,250);
             $total[]  = number_format(commerce_currency_amount_to_decimal($item->commerce_price[LANGUAGE_NONE][0]["amount"],$item->commerce_price[LANGUAGE_NONE][0]["currency_code"])*$cant_prod[$item->product_id],2,".","");
             $quantity[]  = $cant_prod[$item->product_id];
             $unit[]  = number_format(commerce_currency_amount_to_decimal($item->commerce_price[LANGUAGE_NONE][0]["amount"],$item->commerce_price[LANGUAGE_NONE][0]["currency_code"]),2,".","");

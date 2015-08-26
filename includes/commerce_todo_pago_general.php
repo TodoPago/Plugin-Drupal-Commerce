@@ -3,6 +3,26 @@ use TodoPago\Sdk;
 
 include_once(drupal_get_path('module', 'commerce_todo_pago').'/includes/TodoPago/lib/Sdk.php');
 include_once(drupal_get_path('module', 'commerce_todo_pago').'/includes/ControlFraude/ControlFraudeFactory.php');
+include_once(drupal_get_path('module', 'commerce_todo_pago').'/includes/Logger/logger.php');
+
+function TPLog($order = null, $user = null, $endpoint = null) {
+	
+	$logger = new TodoPagoLogger();
+	$logger->setPhpVersion(phpversion());
+	$logger->setCommerceVersion(VERSION);
+	$logger->setPluginVersion("1.1.2");
+	$payment = false;
+	if($order != null)
+		$payment = true;
+	if($payment) {
+		$logger->setEndPoint($endpoint);
+		$logger->setCustomer($user);
+		$logger->setOrder($order);
+	}
+	$logger->setLevels("debug","fatal");
+	$logger->setFile(dirname(__FILE__)."/todopago.log");
+	return $logger->getLogger($payment);
+}
 
 function _phoneSanitize($number){
 	$number = str_replace(array(" ","(",")","-","+"),"",$number);
@@ -57,14 +77,14 @@ function _tranRK($oid)
 	return $res['request_key'];
 }
 
-function first_step_todopago($form, &$form_state, $order, $payment_method)
+function prepare_order($order)
 {
-	global $pane_values,$user;
-	logInfo($order->order_id,'first step');
-	
 	if(_tranEstado($order->order_id) == 0) 
-		_tranCrear($order->order_id);
-	
+		_tranCrear($order->order_id);	
+}
+
+function get_paydata($order, $user, $form, $payment_method)
+{
 	$vertical = $payment_method["settings"]["general"]["segmento"];
 	switch($vertical) {
 		case "Retail":
@@ -87,7 +107,7 @@ function first_step_todopago($form, &$form_state, $order, $payment_method)
 	 foreach($form as $key=>$value){
 		$optionsSAR_operacion[$key] =$value["#value"];   
 	 }
-
+	
 	$monto= commerce_currency_amount_to_decimal($order->commerce_order_total[LANGUAGE_NONE][0]["amount"],$order->commerce_order_total[LANGUAGE_NONE][0]["currency_code"]);
 
 	$settings = $payment_method["settings"];
@@ -116,11 +136,25 @@ function first_step_todopago($form, &$form_state, $order, $payment_method)
 
 	$mode = ($settings["general"]["modo"] == "Produccion")?"prod":"test";
 	//creo el conector con el valor de Authorization, la direccion de WSDL y endpoint que corresponda
-	$connector = new Sdk($http_header, $mode);
-		
-	logInfo($order->order_id,'params SAR',array($optionsSAR_comercio, $optionsSAR_operacion));
+	$connector = new Sdk($http_header, $mode);	
+	
+	return array($connector, $optionsSAR_comercio, $optionsSAR_operacion);
+}
+
+function call_SAR($connector, $order, $optionsSAR_comercio, $optionsSAR_operacion, $payment_method, $form, $form_state)
+{
+	global $user;
+	
+	TPLog($order->order_id, $user->uid, $payment_method["settings"]["general"]["modo"])->info("params SAR ".json_encode(array($optionsSAR_comercio, $optionsSAR_operacion)));
 	$rta = $connector->sendAuthorizeRequest($optionsSAR_comercio, $optionsSAR_operacion);
-	logInfo($order->order_id,'response SAR',$rta);
+	TPLog($order->order_id, $user->uid, $payment_method["settings"]["general"]["modo"])->info("response SAR ".json_encode($rta));
+	
+	$settings = $payment_method["settings"];
+	if ($settings["general"]["modo"] == "Produccion"){
+		$modo = "ambienteproduccion";
+	}else{
+		$modo = "ambientetest";
+	}
 	
 	if ($rta['StatusCode']  != -1)//Si la transacción salió mal
 	{
@@ -146,13 +180,24 @@ function first_step_todopago($form, &$form_state, $order, $payment_method)
 			'#value' => t('Continuar a Todo Pago'),
 			'#weight' => 50,
 	);
-	return $form;
+	return $form;	
 }
 
-function second_step_todopago($order, $return, $user, $ak)
+function first_step_todopago($form, &$form_state, $order, $payment_method)
 {
-	logInfo($order,'second step');
-    
+	global $pane_values,$user;
+	TPLog($order->order_id, $user->uid, $payment_method["settings"]["general"]["modo"])->info('first step');
+	
+	prepare_order($order);
+	list($connector, $optionsSAR_comercio, $optionsSAR_operacion) = get_paydata($order, $user, $form, $payment_method);
+	
+	return call_SAR($connector, $order, $optionsSAR_comercio, $optionsSAR_operacion, $payment_method, $form, $form_state);
+}
+
+function call_GAA($order, $ak)
+{
+	global $user;
+	
 	if(_tranEstado($order) != 2)
 	{
 		throw new Exception("second_step ya realizado");
@@ -175,16 +220,24 @@ function second_step_todopago($order, $return, $user, $ak)
 	$mode = ($settings["general"]["modo"] == "Produccion")?"prod":"test";
     $http_header = json_decode($settings["general"]["authorization"],1);
     $http_header["user_agent"] = 'PHPSoapClient';	
-
+	$oOrder = commerce_order_load($order);
 	$connector = new Sdk($http_header, $mode);	
-	logInfo($order,'params GAA',$optionsGAA);	
+	TPLog($order, $oOrder->uid, $payment_method["settings"]["general"]["modo"])->info('params GAA '.json_encode($optionsGAA));
     $rta2 = $connector->getAuthorizeAnswer($optionsGAA);
-	logInfo($order,'response GAA',$rta2);	
+	TPLog($order, $oOrder->uid, $payment_method["settings"]["general"]["modo"])->info('response GAA '.json_encode($rta2));
 	
 	$now = new DateTime();
 	_tranUpdate($order, array("second_step" => $now->format('Y-m-d H:i:s'), "params_GAA" => json_encode($optionsGAA), "response_GAA" => json_encode($rta2), "answer_key" => $ak));
 	
+	return $rta2;	
+}
+
+function take_action($order, $rta2)
+{
     $order = commerce_order_load($order);
+    $payment_method = commerce_payment_method_instance_load('bank_transfer|commerce_payment_bank_transfer');
+    $settings = $payment_method["settings"];
+	
     if ($rta2["StatusCode"]=="-1"){
         $status = $settings["status"]["aprobada"];
         $transaction = commerce_payment_transaction_new('bank_transfer', $order->order_id);
@@ -250,6 +303,18 @@ function second_step_todopago($order, $return, $user, $ak)
             commerce_payment_redirect_pane_previous_page($order);
             drupal_goto(commerce_checkout_order_uri($order));
         }   
-    }
+    }	
+}
+
+function second_step_todopago($order, $return, $user, $ak)
+{
+	$payment_method = commerce_payment_method_instance_load('bank_transfer|commerce_payment_bank_transfer');
+	
+	$oOrder = commerce_order_load($order);
+    TPLog($order, $oOrder->uid, $payment_method["settings"]["general"]["modo"])->info('second step');
+	
+	$rta = call_GAA($order, $ak);
+	
+	return take_action($order, $rta);
 	
 }
