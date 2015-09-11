@@ -28,7 +28,7 @@ El plug in de pagos de <strong>Todo Pago</strong>, provee a las tiendas Drupal C
 ![imagen de configuracion](https://raw.githubusercontent.com/TodoPago/imagenes/master/drupalcommerce/2-activacion.PNG)
 
 Observaci&oacute;n:
-Descomentar: <em>extension=php_soap.dll</em> del php.ini, ya que para la conexión al gateway se utiliza la clase <em>SoapClient</em> del API de PHP.
+Descomentar: <em>extension=php_soap.dll</em> y <em>extension=php_openssl.dll</em> del php.ini, ya que para la conexión al gateway se utiliza la clase <em>SoapClient</em> del API de PHP.
 <br />
 [<sub>Volver a inicio</sub>](#inicio)
 
