@@ -1,4 +1,5 @@
 <?php
+include(drupal_get_path('module', 'commerce_todo_pago').'/vendor/autoload.php');
 include(drupal_get_path('module', 'commerce_todo_pago').'/includes/commerce_todo_pago_general.php');
 
 function commerce_todo_pago_block_view(){ 
@@ -29,6 +30,12 @@ function commerce_todo_pago_commerce_payment_method_info() {
   );
 
   return $payment_methods;
+}
+
+function commerce_todo_pago_push($order,$return) {
+	$ak = $_REQUEST["Answer"];
+	$order_id = $_REQUEST["Order"];
+	push_notification($order_id,$ak); 
 }
 
 function commerce_todo_pago_handle_response($order,$return){
@@ -68,7 +75,14 @@ function commerce_todo_pago_menu() {
       'access arguments' => array('access checkout'),
       'type' => MENU_CALLBACK,
   );
-
+  
+   $items['commerce/todopago/push'] = array(
+      'title' => 'todopago push', 
+      'page callback' => 'commerce_todo_pago_push',   
+      'access arguments' => array('access checkout'),
+      'type' => MENU_CALLBACK,
+  );
+  
   $items['admin/commerce/config/todopago'] = array(
     'title' => 'Todo Pago',
     'description' => 'Listado de todas los pedidos',
@@ -384,7 +398,7 @@ function commerce_todo_pago_settings_form($settings = NULL) {
   
 
   $form['commerce_todo_pago_help_text'] = array(
-    '#markup' => '<div class="help">' . t('<p><strong>v1.2.0</strong></p><h4><strong>Instrucciones de uso</strong></h4><p>Complete los campos con los valores provistos por Todo Pago</p>') . '</div>', 
+    '#markup' => '<div class="help">' . t('<p><strong>v1.3.0</strong></p><h4><strong>Instrucciones de uso</strong></h4><p>Complete los campos con los valores provistos por Todo Pago</p>') . '</div>', 
   );
 
   $form['general'] = array(
@@ -408,7 +422,7 @@ function commerce_todo_pago_settings_form($settings = NULL) {
   $form['general']['authorization'] = array(
     '#type' => 'textfield',
     '#title' => t('Authorization HTTP'),
-	'#description'=>t('se deben para datos en formato json. ejemplo: { "Authorization":"PRISMA 912EC803B2CE49E4A541068D495AB570"}'),
+	'#description'=>t('Ingresar el contenido del campo API Keys (Credenciales) del Portal de TodoPago. Ejemplo: "PRISMA 912EC803B2CE49E4A541068D495AB570"'),
     '#default_value' => isset($settings['general']['authorization']) ? $settings['general']['authorization'] : '',
     '#required' => FALSE,
 	'#maxlength'=>500
@@ -458,7 +472,7 @@ function commerce_todo_pago_settings_form($settings = NULL) {
   
       $form['ambientetest']['idsite'] = array(
     '#type' => 'textfield',
-    '#title' => t('Id Site Todo Pago'),
+    '#title' => t('Nro. de Comercio - Merchant ID'),
 	'#description'=>t('Número de Comercio provisto por Todo Pago'),
     '#default_value' => isset($settings['ambientetest']['idsite']) ? $settings['ambientetest']['idsite'] : '',
     '#required' => FALSE,
@@ -468,7 +482,7 @@ function commerce_todo_pago_settings_form($settings = NULL) {
       $form['ambientetest']['security'] = array(
     '#type' => 'textfield',
     '#title' => t('Security code'),
-	'#description'=>t('Código provisto por Todo Pago'),
+	'#description'=>t('API Keys sin PRISMA/TODOPAGO y sin espacio'),
     '#default_value' => isset($settings['ambientetest']['security']) ? $settings['ambientetest']['security'] : '',
     '#required' => FALSE,
   );
@@ -482,7 +496,7 @@ function commerce_todo_pago_settings_form($settings = NULL) {
   
       $form['ambienteproduccion']['idsite'] = array(
     '#type' => 'textfield',
-    '#title' => t('Id Site Todo Pago'),
+    '#title' => t('Nro. de Comercio - Merchant ID'),
 	'#description'=>t('Número de Comercio provisto por Todo Pago'),
     '#default_value' => isset($settings['ambienteproduccion']['idsite']) ? $settings['ambienteproduccion']['idsite'] : '',
     '#required' => FALSE,
@@ -492,13 +506,13 @@ function commerce_todo_pago_settings_form($settings = NULL) {
       $form['ambienteproduccion']['security'] = array(
     '#type' => 'textfield',
     '#title' => t('Security code'),
-	'#description'=>t('Código provisto por Todo Pago'),
+	'#description'=>t('API Keys sin PRISMA/TODOPAGO y sin espacio'),
     '#default_value' => isset($settings['ambienteproduccion']['security']) ? $settings['ambienteproduccion']['security'] : '',
     '#required' => FALSE,
   );
   
   
-    $order_statuses = module_invoke_all('commerce_order_status_info');
+	$order_statuses = module_invoke_all('commerce_order_status_info');
 	
 	
 	
@@ -569,7 +583,7 @@ function commerce_todo_pago_submit_form($payment_method, $pane_values, $checkout
   global $base_path;
   $form['bank_details'] = array(
  
-    '#markup' => '<p><img src="'.$base_path.drupal_get_path('module', 'commerce_todo_pago').'/images/todopago.jpg">',
+    '#markup' => '<p><img src="http://www.todopago.com.ar/sites/todopago.com.ar/files/pluginstarjeta.jpg"></p>',
  );
 
   return $form;

@@ -13,7 +13,7 @@ Plug in para la integración con gateway de pago <strong>Todo Pago</strong>
 
 [](#consideracionesgenerales)
 ## Consideraciones Generales
-El plug in de pagos de <strong>Todo Pago</strong>, provee a las tiendas Drupal Commerce de un nuevo m&eacute;todo de pago, integrando la tienda al gateway de pago. La versión de este plug in esta testeada en PHP 5.3.29 y Drupal 7 y Drupal Commerce  1.11
+El plug in de pagos de <strong>Todo Pago</strong>, provee a las tiendas Drupal Commerce de un nuevo m&eacute;todo de pago, integrando la tienda al gateway de pago. La versión de este plug in esta testeada en PHP 5.3 en adelante y Drupal 7 con Drupal Commerce  1.11
 
 <a name="instalacion"></a>
 ## Instalación
@@ -28,7 +28,11 @@ El plug in de pagos de <strong>Todo Pago</strong>, provee a las tiendas Drupal C
 ![imagen de configuracion](https://raw.githubusercontent.com/TodoPago/imagenes/master/drupalcommerce/2-activacion.PNG)
 
 Observaci&oacute;n:
+<<<<<<< HEAD
+Descomentar: <em>extension=php_curl.dll</em>, <em>extension=php_openssl.dll</em> y <em>extension=php_soap.dll</em> del php.ini, ya que para la conexión al gateway se utiliza la clase <em>SoapClient</em> del API de PHP.
+=======
 Descomentar: <em>extension=php_soap.dll</em> y <em>extension=php_openssl.dll</em> del php.ini, ya que para la conexión al gateway se utiliza la clase <em>SoapClient</em> del API de PHP.
+>>>>>>> master
 <br />
 [<sub>Volver a inicio</sub>](#inicio)
 
@@ -44,7 +48,10 @@ La configuracion del Plug in esta dividido en 4 solapas desplegables (GENERAL, A
 <br />
 
 [<sub>Volver a inicio</sub>](#inicio)
+<<<<<<< HEAD
+=======
 <a name="tca"></a>
+>>>>>>> master
 
 <a name="cybersource"></a>
 ## Prevención de Fraude
@@ -77,7 +84,7 @@ El plugin genera un link para ver el estado de las transacciones,  para acceder 
 <tr><td>Chubut</td><td>U</td></tr>
 <tr><td>Córdoba</td><td>X</td></tr>
 <tr><td>Corrientes</td><td>W</td></tr>
-<tr><td>Entre Ríos</td><td>R</td></tr>
+<tr><td>Entre Ríos</td><td>E</td></tr>
 <tr><td>Formosa</td><td>P</td></tr>
 <tr><td>Jujuy</td><td>Y</td></tr>
 <tr><td>La Pampa</td><td>L</td></tr>

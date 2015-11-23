@@ -1,7 +1,6 @@
 <?php
 use TodoPago\Sdk;
 
-include_once(drupal_get_path('module', 'commerce_todo_pago').'/includes/TodoPago/lib/Sdk.php');
 include_once(drupal_get_path('module', 'commerce_todo_pago').'/includes/ControlFraude/ControlFraudeFactory.php');
 include_once(drupal_get_path('module', 'commerce_todo_pago').'/includes/Logger/logger.php');
 
@@ -10,7 +9,7 @@ function TPLog($order = null, $user = null, $endpoint = null) {
 	$logger = new TodoPagoLogger();
 	$logger->setPhpVersion(phpversion());
 	$logger->setCommerceVersion(VERSION);
-	$logger->setPluginVersion("1.1.2");
+	$logger->setPluginVersion("1.2.1");
 	$payment = false;
 	if($order != null)
 		$payment = true;
@@ -77,6 +76,13 @@ function _tranRK($oid)
 	return $res['request_key'];
 }
 
+function _tranResult($oid)
+{
+	$res = db_query("SELECT * FROM {todopago_transaccion} WHERE id_orden=".$oid);
+	$res = $res->fetchAssoc();
+	return $res;
+}
+
 function prepare_order($order)
 {
 	if(_tranEstado($order->order_id) == 0) 
@@ -112,15 +118,12 @@ function get_paydata($order, $user, $form, $payment_method)
 
 	$settings = $payment_method["settings"];
 
-	if ($settings["general"]["modo"] == "Produccion"){
-		$modo = "ambienteproduccion";
-	}else{
-		$modo = "ambientetest";
-	}
-
-	$http_header = json_decode($settings["general"]["authorization"],1);
-	$http_header["user_agent"] = 'PHPSoapClient';
-
+    if ($settings["general"]["modo"] == "Produccion"){
+        $modo = "ambienteproduccion";
+    }else{
+         $modo = "ambientetest";
+    }
+	
 	$optionsSAR_comercio = array (
 		'Security'=>$settings[$modo]["security"],
 		'EncodingMethod'=>'XML',
@@ -134,9 +137,8 @@ function get_paydata($order, $user, $form, $payment_method)
 	$optionsSAR_operacion["CURRENCYCODE"]	=032;
 	$optionsSAR_operacion["AMOUNT"]	=$monto;
 
-	$mode = ($settings["general"]["modo"] == "Produccion")?"prod":"test";
-	//creo el conector con el valor de Authorization, la direccion de WSDL y endpoint que corresponda
-	$connector = new Sdk($http_header, $mode);	
+	//creo el conector con el valor de Authorization, la direccion de WSDL y endpoint que corresponda	
+	$connector = get_connector($settings);
 	
 	return array($connector, $optionsSAR_comercio, $optionsSAR_operacion);
 }
@@ -204,24 +206,10 @@ function call_GAA($order, $ak)
 	}	
     $payment_method = commerce_payment_method_instance_load('bank_transfer|commerce_payment_bank_transfer');
     $settings = $payment_method["settings"];
-    if ($settings["general"]["modo"] == "Produccion"){
-        $modo = "ambienteproduccion";
-    }else{
-         $modo = "ambientetest";
-    }
-
-    $optionsGAA = array (     
-        'Security'=>$settings[$modo]["security"],
-    	'Merchant'=>$settings[$modo]["idsite"],   
-        'RequestKey' => _tranRK($order),       
-        'AnswerKey'  => $ak      
-    );      
-
-	$mode = ($settings["general"]["modo"] == "Produccion")?"prod":"test";
-    $http_header = json_decode($settings["general"]["authorization"],1);
-    $http_header["user_agent"] = 'PHPSoapClient';	
 	$oOrder = commerce_order_load($order);
-	$connector = new Sdk($http_header, $mode);	
+	
+	$connector = get_connector($settings);
+
 	TPLog($order, $oOrder->uid, $payment_method["settings"]["general"]["modo"])->info('params GAA '.json_encode($optionsGAA));
     $rta2 = $connector->getAuthorizeAnswer($optionsGAA);
 	TPLog($order, $oOrder->uid, $payment_method["settings"]["general"]["modo"])->info('response GAA '.json_encode($rta2));
@@ -318,3 +306,59 @@ function second_step_todopago($order, $return, $user, $ak)
 	return take_action($order, $rta);
 	
 }
+
+function get_payment_methods($payment_method)
+{
+	$settings = $payment_method;
+	$connector = get_connector($settings);
+	
+	return $connector->discoverPaymentMethods();
+}
+
+function get_connector($settings) 
+{
+	
+	$mode = ($settings["general"]["modo"] == "Produccion")?"prod":"test";
+    $http_header = json_decode($settings["general"]["authorization"],1);
+	if($http_header == null) {
+		$http_header = array("Authorization" => $settings["general"]["authorization"]);
+	}
+	$connector = new Sdk($http_header, $mode);
+	
+	return $connector;
+}
+
+if (!function_exists('http_response_code'))
+{
+    function http_response_code($newcode = NULL)
+    {
+        static $code = 200;
+        if($newcode !== NULL)
+        {
+            header('X-PHP-Response-Code: '.$newcode, true, $newcode);
+            if(!headers_sent())
+                $code = $newcode;
+        }       
+        return $code;
+    }
+}
+
+function push_notification($order_id,$ak)
+{
+	$transaccion = _tranResult($order_id);
+	
+	if(!$transaccion) {
+		http_response_code(404);
+		return;
+	}
+	
+	if($transaccion["answer_key"] != $ak) {
+		http_response_code(400);
+		return;
+	}
+	
+	//Actualizar order status
+	echo "OK";	
+	
+}
+

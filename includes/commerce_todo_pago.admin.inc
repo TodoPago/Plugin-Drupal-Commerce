@@ -1,6 +1,5 @@
 <?php
 use TodoPago\Sdk;
-include_once(drupal_get_path('module', 'commerce_todo_pago').'/includes/TodoPago/lib/Sdk.php');
 
 function getOrders() {
 	$res = db_query("SELECT * FROM {todopago_transaccion}");
