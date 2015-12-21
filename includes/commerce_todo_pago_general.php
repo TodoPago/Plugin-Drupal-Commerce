@@ -9,7 +9,7 @@ function TPLog($order = null, $user = null, $endpoint = null) {
 	$logger = new TodoPagoLogger();
 	$logger->setPhpVersion(phpversion());
 	$logger->setCommerceVersion(VERSION);
-	$logger->setPluginVersion("1.2.1");
+	$logger->setPluginVersion("1.3.1");
 	$payment = false;
 	if($order != null)
 		$payment = true;
@@ -207,6 +207,19 @@ function call_GAA($order, $ak)
     $payment_method = commerce_payment_method_instance_load('bank_transfer|commerce_payment_bank_transfer');
     $settings = $payment_method["settings"];
 	$oOrder = commerce_order_load($order);
+	
+    if ($settings["general"]["modo"] == "Produccion"){
+        $modo = "ambienteproduccion";
+    }else{
+         $modo = "ambientetest";
+    }
+	
+    $optionsGAA = array (     
+        'Security'=>$settings[$modo]["security"],
+    	'Merchant'=>$settings[$modo]["idsite"],   
+        'RequestKey' => _tranRK($order),       
+        'AnswerKey'  => $ak      
+    );  
 	
 	$connector = get_connector($settings);
 

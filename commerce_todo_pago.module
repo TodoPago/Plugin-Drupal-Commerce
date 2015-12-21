@@ -398,7 +398,7 @@ function commerce_todo_pago_settings_form($settings = NULL) {
   
 
   $form['commerce_todo_pago_help_text'] = array(
-    '#markup' => '<div class="help">' . t('<p><strong>v1.3.0</strong></p><h4><strong>Instrucciones de uso</strong></h4><p>Complete los campos con los valores provistos por Todo Pago</p>') . '</div>', 
+    '#markup' => '<div class="help">' . t('<p><strong>v1.3.1</strong></p><h4><strong>Instrucciones de uso</strong></h4><p>Complete los campos con los valores provistos por Todo Pago</p>') . '</div>', 
   );
 
   $form['general'] = array(
