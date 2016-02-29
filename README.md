@@ -9,6 +9,7 @@ Plug in para la integración con gateway de pago <strong>Todo Pago</strong>
  - [Configuración plug in](#confplugin)
 - [Datos adiccionales para prevención de fraude](#cybersource) 
 - [Consulta de transacciones](#constrans)
+- [Devoluciones](#devoluciones)
 - [Tablas de referencia](#tablas)
 
 [](#consideracionesgenerales)
@@ -68,6 +69,14 @@ El plugin genera un link para ver el estado de las transacciones,  para acceder 
 
 ![imagen consulta de trnasacciones](https://raw.githubusercontent.com/TodoPago/imagenes/master/drupalcommerce/5-status%20de%20las%20operaciones.png)<br />
 [<sub>Volver a inicio</sub>](#inicio)
+
+<a name="devoluciones"></a>
+## Devolucinones
+Es posible realizar devoluciones o reembolsos de las operaciones realizadas con Todo Pago. Para ello dirigirse a "Store Settings" -> "Todo Pago", allí deberá hacerse click en el link "Realizar una devolucion".
+![imagen devoluciones](https://raw.githubusercontent.com/TodoPago/imagenes/master/drupalcommerce/drupaldevo.png)<br />
+
+[<sub>Volver a inicio</sub>](#inicio)
+
 
 <a name="tablas"></a>
 ## Tablas de Referencia
