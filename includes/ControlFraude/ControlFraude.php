@@ -80,7 +80,15 @@ abstract class ControlFraude {
 
         foreach ($products as $item) {
 			$code[] = $this->getCategoryArray($item);
-            $desc = TodoPago\Sdk::sanitizeValue($item->title);
+
+			if(!empty($item->description)){
+				$desc = $item->description;
+			}else{
+				$desc = $item->title;
+			}
+
+			$desc = strip_tags($desc);
+            $desc = TodoPago\Sdk::sanitizeValue($desc);
             $desc = substr($desc,0,50);
             $description[]   = $desc;
             

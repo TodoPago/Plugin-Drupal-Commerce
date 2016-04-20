@@ -1,0 +1,12 @@
+.btn-credencial{
+    color: #5a5a5a;
+    border-radius: 4px;
+    -moz-box-shadow: 0 1px 2px #cccccc, inset 0 1px 1px white;
+    /* -webkit-box-shadow: 0 1px 2px #cccccc, inset 0 1px 1px white; */
+    box-shadow: 0 1px 2px #cccccc, inset 0 1px 1px white;
+    background: linear-gradient(to bottom, #fefefe 0%, #e0e0e0 100%);
+    font: normal 500 16px/16px "Open Sans", Arial, sans-serif;
+    margin: 5px 0 10px 0px;
+    padding: 6px 30px;
+    text-decoration: none;
+}

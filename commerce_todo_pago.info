@@ -15,7 +15,7 @@ core = 7.x
 
 
 ; Information added by drupal.org packaging script on 2012-03-24
-version = "1.2.1"
+version = "1.5.0"
 core = "7.x"
 project = "commerce_todo_pago"
 datestamp = "1332606952"

@@ -85,7 +85,7 @@ function commerce_todo_pago_admin_form($form, &$form_state,$order = false) {
 		$tabla .= "<tr><td>Ord.</td><td>Estado</td><td></td><td></td></tr>";
 		foreach($orders as $ord) {
 			$orden = commerce_order_load($ord->id_orden);
-			$tabla .= "<tr><td>".$ord->id_orden."</td><td>".$orden->status."</td><td><a href='admin/commerce/orders/".$ord->id_orden."/todo_pago'>Detalle</a></td><td><a href='admin/commerce/orders/".$ord->id_orden."/todo_pago_devolucion'>Realizar una devolucion</a></td></tr>";
+			$tabla .= "<tr><td>".$ord->id_orden."</td><td>".$orden->status."</td><td><a href='?q=admin/commerce/orders/".$ord->id_orden."/todo_pago'>Detalle</a></td><td><a href='?q=admin/commerce/orders/".$ord->id_orden."/todo_pago_devolucion'>Realizar una devolucion</a></td></tr>";
 		}
 		$tabla .= "</table>";
 		$form['confirmation'] = array(
@@ -97,15 +97,34 @@ function commerce_todo_pago_admin_form($form, &$form_state,$order = false) {
 		$optionsGS = array('MERCHANT'=>$settings[$modo]["idsite"], 'OPERATIONID'=>$order->order_id); 
 	  
 	  
-	   $rta4 = $connector->getStatus($optionsGS);   
+	    $rta4 = $connector->getStatus($optionsGS);   
 		if (isset($rta4["Operations"])){
+			$tabla = "";
 			
-			 $rta4 = $rta4["Operations"];
-		$tabla = "";
-		foreach($rta4 as $key => $value){
-			$tabla .="<tr><td>".$key."</td><td>".$value."</td></tr>";
-			
-		}
+			//cambios en get status
+			foreach($rta4['Operations'] as $key => $value){
+				
+				if($key == "REFUNDS"){	
+					$tabla .= "<tr><td style='vertical-align: top;''>".$key."</td>";
+					if(is_array($value)){
+						$tabla .= "<td><table width='100%'>";
+						$tabla .= "<tr><td>Order ID</td><td>Amount</td><td>Date</td></tr>";
+						foreach ($value as $key => $refundsList){
+							foreach($refundsList as $key => $value){
+								$tabla .= "<tr><td>".$value['ID']."</td><td>".$value['AMOUNT']."</td><td>".$value['DATE']."</td></tr>";
+							}
+						}
+						$tabla .= "</table></td>";
+					}else{
+						$tabla .= "No tiene datos<br>";
+					}
+					$tabla .= "</tr>";
+					
+				}else{
+					$tabla .= "<tr><td>".$key."</td><td>".$value."</td></tr>";
+				}
+			}	
+
 		}else{
 			$tabla = "No hay operaciones para consultar";
 		}

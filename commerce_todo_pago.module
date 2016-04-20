@@ -2,6 +2,20 @@
 include(drupal_get_path('module', 'commerce_todo_pago').'/vendor/autoload.php');
 include(drupal_get_path('module', 'commerce_todo_pago').'/includes/commerce_todo_pago_general.php');
 
+
+function commerce_todo_pago_init() {
+
+
+    //obtengo nombre de carpeta del plugin
+    $elements = explode("/",drupal_get_path('module', 'commerce_todo_pago'));
+
+    $properties = array(
+      'moduleNameFolder' => end($elements),
+    );
+
+    drupal_add_js(array('TPmodule' => $properties), 'setting');
+}
+
 function commerce_todo_pago_block_view(){ 
   global $base_path;
   drupal_add_js($base_path.drupal_get_path('module', 'commerce_todo_pago') .'/includes/todopago.js', array("type"=>"file","requires_jquery"=> TRUE));
@@ -12,9 +26,9 @@ function commerce_todo_pago_form_alter(&$form, $form_state, $form_id) {
   if($form_id == 'commerce_checkout_form_checkout'){
     drupal_add_js($base_path.drupal_get_path('module', 'commerce_todo_pago') .'/includes/jquery.min.js', array("type"=>"file"));
     commerce_todo_pago_block_view();
+
   } 
 }
-
 
 function commerce_todo_pago_commerce_payment_method_info() {
     
@@ -40,8 +54,16 @@ function commerce_todo_pago_push($order,$return) {
 
 function commerce_todo_pago_handle_response($order,$return){
     global $user;   
-    $ak = $_REQUEST["Answer"];
-	second_step_todopago($order, $return, $user, $ak);
+
+    if(isset($_REQUEST["Answer"])){
+      //formulario externo
+      $ak = $_REQUEST["Answer"];
+    }else{
+      //formulario hibrido
+      $answer = explode("=", $_REQUEST['q']);
+      $ak = $answer[1];
+    }
+    second_step_todopago($order, $return, $user, $ak);
 }
 
 function commerce_todo_pago_redirect_form($form, &$form_state, $order, $payment_method) {
@@ -53,7 +75,6 @@ function commerce_todo_pago_redirect_form($form, &$form_state, $order, $payment_
  */
  
 function commerce_todo_pago_order_status_info() {
-
 
   $order_statuses = array();
 
@@ -69,20 +90,20 @@ function commerce_todo_pago_order_status_info() {
 function commerce_todo_pago_menu() {
   $items = array();
  
-   $items['commerce/todopago/notification'] = array(
+  $items['commerce/todopago/notification'] = array(
       'title' => 'todopago response', 
       'page callback' => 'commerce_todo_pago_handle_response',   
       'access arguments' => array('access checkout'),
       'type' => MENU_CALLBACK,
   );
   
-   $items['commerce/todopago/push'] = array(
+  $items['commerce/todopago/push'] = array(
       'title' => 'todopago push', 
       'page callback' => 'commerce_todo_pago_push',   
       'access arguments' => array('access checkout'),
       'type' => MENU_CALLBACK,
   );
-  
+
   $items['admin/commerce/config/todopago'] = array(
     'title' => 'Todo Pago',
     'description' => 'Listado de todas los pedidos',
@@ -90,11 +111,11 @@ function commerce_todo_pago_menu() {
     'page arguments' => array('commerce_todo_pago_admin_form'),
     'access arguments' => array('administer commerce_todo_pago settings'),
     'file' => 'includes/commerce_todo_pago.admin.inc',
-	'file path' => drupal_get_path('module', 'commerce_todo_pago'),
+    'file path' => drupal_get_path('module', 'commerce_todo_pago'),
     'type'  => MENU_NORMAL_ITEM,
   );
   
-   $items['admin/commerce/orders/%commerce_order/todo_pago'] = array(
+  $items['admin/commerce/orders/%commerce_order/todo_pago'] = array(
     'title' => 'Todo Pago Status',
     'page callback' => 'drupal_get_form',
     'page arguments' => array('commerce_todo_pago_admin_form',3,3),
@@ -103,10 +124,10 @@ function commerce_todo_pago_menu() {
     'context' => MENU_CONTEXT_INLINE,
     'weight' => 2,
     'file' => 'includes/commerce_todo_pago.admin.inc',
-	'file path' => drupal_get_path('module', 'commerce_todo_pago'),
+    'file path' => drupal_get_path('module', 'commerce_todo_pago'),
   );
   
-   $items['admin/commerce/orders/%commerce_order/todo_pago_devolucion'] = array(
+  $items['admin/commerce/orders/%commerce_order/todo_pago_devolucion'] = array(
     'title' => 'Todo Pago - Devolucion',
     'page callback' => 'drupal_get_form',
     'page arguments' => array('commerce_todo_pago_devolucion_form',3,3),
@@ -115,17 +136,17 @@ function commerce_todo_pago_menu() {
     'context' => MENU_CONTEXT_INLINE,
     'weight' => 2,
     'file' => 'includes/commerce_todo_pago.admin.inc',
-	'file path' => drupal_get_path('module', 'commerce_todo_pago'),
+    'file path' => drupal_get_path('module', 'commerce_todo_pago'),
   );
-  
+
   return $items;
 }
 
 
 function commerce_todo_pago_enable(){
-    commerce_todo_pago_add_checkout_fields();
-    commerce_todo_pago_add_product_fields();
-	commerce_todo_pago_database();
+  commerce_todo_pago_add_checkout_fields();
+  commerce_todo_pago_add_product_fields();
+  commerce_todo_pago_database();
     
 } 
 
@@ -405,11 +426,16 @@ function commerce_todo_pago_settings_form($settings = NULL) {
     'commerce_todo_pago_subject_oid' => FALSE,
   );
 
+  $form['#attached']['js'] = array(
+    drupal_get_path('module', 'commerce_todo_pago') . '/includes/credenciales.js',
+  );
 
+  $form['#attached']['css'] = array(
+    drupal_get_path('module', 'commerce_todo_pago') . '/includes/tp-styles.css',
+  );
   
-
   $form['commerce_todo_pago_help_text'] = array(
-    '#markup' => '<div class="help">' . t('<p><strong>v1.4.0</strong></p><h4><strong>Instrucciones de uso</strong></h4><p>Complete los campos con los valores provistos por Todo Pago</p>') . '</div>', 
+    '#markup' => '<div class="help">' . t('<p><strong>v1.5.0</strong></p><h4><strong>Instrucciones de uso</strong></h4><p>Complete los campos con los valores provistos por Todo Pago</p>') . '</div>', 
   );
 
   $form['general'] = array(
@@ -421,9 +447,9 @@ function commerce_todo_pago_settings_form($settings = NULL) {
   $form['general']['enabled'] = array(
     '#type' => 'select',
     '#title' => t('Account owner'),
-	'#options' => array(
+	  '#options' => array(
           1 => t('Habilitado'),
-         0 => t('Deshabilitado'),
+          0 => t('Deshabilitado'),
        ),
     '#description' => t('Habilitado.'),
     '#default_value' => isset($settings['general']['enabled']) ? $settings['general']['enabled'] : '0', 
@@ -440,28 +466,28 @@ function commerce_todo_pago_settings_form($settings = NULL) {
   );
    
   
-    $form['general']['segmento'] = array(
+  $form['general']['segmento'] = array(
     '#type' => 'select',
-	'#options' => array(
+	  '#options' => array(
           'Retail' => t('Retail'),
          'Ticketing' => t('Ticketing'),
          'Services' => t('Services'),
          'Digital_Goods' => t('Digital Goods'),
        ),
     '#title' => t('Segmento del Comercio'),
-	'#description'=>t('La elección del segmento determina los tipos de datos a enviar'),
+	 '#description'=>t('La elecci&oacute;n del segmento determina los tipos de datos a enviar'),
     '#default_value' => isset($settings['general']['segmento']) ? $settings['general']['segmento'] : 'Retail',
     '#required' => FALSE,
   );
 
   $form['general']['modo'] = array(
     '#type' => 'select',
-	'#options' => array(
+	  '#options' => array(
           'Test' => t('Developers'),
          'Produccion' => t('Produccion'),
       ),
     '#title' => t('Ambiente Developers o Producción'),
-	'#description'=>t('Debe ser cofigurado en CONFIGURACION - AMBIENTE DEVELOPERS / PRODUCCION'),
+	  '#description'=>t('Debe ser cofigurado en CONFIGURACION - AMBIENTE DEVELOPERS / PRODUCCION'),
     '#default_value' => isset($settings['general']['modo']) ? $settings['general']['modo'] : 'Test',
     '#required' => FALSE,
   );
@@ -469,65 +495,107 @@ function commerce_todo_pago_settings_form($settings = NULL) {
    $form['general']['deadline'] = array(
     '#type' => 'textfield',
     '#title' => t('Dead Line'),
-	'#description'=>t('días máximos para la entrega'),
+	'#description'=>t('d&iacute;as m&acute;ximos para la entrega'),
     '#default_value' => isset($settings['general']['deadline']) ? $settings['general']['deadline'] : '',
     '#required' => FALSE,
   );
   
-   $form['ambientetest'] = array(
+  $form['general']['form'] = array(
+    '#type' => 'select',
+	  '#options' => array(
+          '0' => t('Deshabilitado'),
+         '1' => t('Habilitado'),
+      ),
+    '#title' => t('Formularion on-site'),
+	  '#description'=>t('Seleccione formulario con redirecci&oacute;n u on-site'),
+    '#default_value' => isset($settings['general']['form']) ? $settings['general']['form'] : '0',
+    '#required' => FALSE,
+  );
+  
+  $form['ambientetest'] = array(
     '#type' => 'fieldset',
     '#title' => t('AMBIENTE DEVELOPERS'),
     '#collapsible' => TRUE,
     '#collapsed' => FALSE,
   ); 
-  
-      $form['ambientetest']['idsite'] = array(
+
+  $form['ambientetest']['button-credencial']= array(
+    '#markup' => '<button type="button" id="credenciales-dev" class="btn-credencial">'.t('Credentials').'</button>', 
+  );
+
+  $form['ambientetest']['idsite'] = array(
     '#type' => 'textfield',
     '#title' => t('Nro. de Comercio - Merchant ID'),
-	'#description'=>t('Número de Comercio provisto por Todo Pago'),
+    '#description'=>t('N&uacute;mero de Comercio provisto por Todo Pago'),
     '#default_value' => isset($settings['ambientetest']['idsite']) ? $settings['ambientetest']['idsite'] : '',
     '#required' => FALSE,
   );
   
-  
-      $form['ambientetest']['security'] = array(
+  $form['ambientetest']['security'] = array(
     '#type' => 'textfield',
     '#title' => t('Security code'),
-	'#description'=>t('API Keys sin PRISMA/TODOPAGO y sin espacio'),
+	  '#description'=>t('API Keys sin PRISMA/TODOPAGO y sin espacio'),
     '#default_value' => isset($settings['ambientetest']['security']) ? $settings['ambientetest']['security'] : '',
     '#required' => FALSE,
   );
   
-     $form['ambienteproduccion'] = array(
+  $form['ambienteproduccion'] = array(
     '#type' => 'fieldset',
     '#title' => t('AMBIENTE PRODUCCION'),
     '#collapsible' => TRUE,
     '#collapsed' => FALSE,
   );
-  
-      $form['ambienteproduccion']['idsite'] = array(
+
+  $form['ambienteproduccion']['button-credencial']= array(
+    '#markup' => '<button type="button" id="credenciales-prod" class="btn-credencial">'.t('Credentials').'</button>', 
+  );
+
+  $form['ambienteproduccion']['idsite'] = array(
     '#type' => 'textfield',
     '#title' => t('Nro. de Comercio - Merchant ID'),
-	'#description'=>t('Número de Comercio provisto por Todo Pago'),
+	'#description'=>t('N&uacute;mero de Comercio provisto por Todo Pago'),
     '#default_value' => isset($settings['ambienteproduccion']['idsite']) ? $settings['ambienteproduccion']['idsite'] : '',
     '#required' => FALSE,
   );
   
-  
-      $form['ambienteproduccion']['security'] = array(
+  $form['ambienteproduccion']['security'] = array(
     '#type' => 'textfield',
     '#title' => t('Security code'),
-	'#description'=>t('API Keys sin PRISMA/TODOPAGO y sin espacio'),
+	  '#description'=>t('API Keys sin PRISMA/TODOPAGO y sin espacio'),
     '#default_value' => isset($settings['ambienteproduccion']['security']) ? $settings['ambienteproduccion']['security'] : '',
     '#required' => FALSE,
   );
   
+  $form['login-credential'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('OBTENER CREDENCIALES'),
+    '#collapsible' => FALSE,
+    '#collapsed' => FALSE
+  );
+
+  $form['login-credential']['tp-user'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Usuario de Todo Pago'),
+    '#required' => FALSE,
+  );
   
+  $form['login-credential']['tp-password'] = array(
+    '#type' => 'password',
+    '#title' => t('Contrase&ntilde;a de Todo Pago'),
+    '#required' => FALSE,
+  );
+
+  $form['login-credential']['message']= array(
+    '#markup' => '<div class="loader" style="display:none;"><img class="loader-image" src="'.drupal_get_path("module", "commerce_todo_pago").'/includes/images/loader.gif" alt="loading.."></div><div id="error_message"></div>', 
+  );
+
+  $form['login-credential']['button-credencial']= array(
+    '#markup' => '<button type="button" id="login-credencial" class="btn-credencial">'.t('Credentials').'</button>', 
+  );
+
 	$order_statuses = module_invoke_all('commerce_order_status_info');
 	
-	
-	
-	  $form['status'] = array(
+  $form['status'] = array(
     '#type' => 'fieldset',
     '#title' => t('ESTADOS DEL PEDIDO'),
     '#collapsible' => TRUE,
@@ -540,25 +608,24 @@ function commerce_todo_pago_settings_form($settings = NULL) {
     }
   }
   
-      $form['status']['start'] = array(
+  $form['status']['start'] = array(
     '#type' => 'select',
 	'#options' => $options,
     '#title' => t('Estado cuando la transaccion ha sido iniciada'),
-
     '#default_value' => isset($settings['status']['start']) ? $settings['status']['start'] : '',
     '#required' => FALSE,
   );
 
-      $form['status']['aprobada'] = array(
+  $form['status']['aprobada'] = array(
     '#type' => 'select',
-	'#options' => $options,
+	 '#options' => $options,
     '#title' => t('Estado cuando la transaccion ha sido aprobada'),
 
     '#default_value' => isset($settings['status']['aprobada']) ? $settings['status']['aprobada'] : '',
     '#required' => FALSE,
   );
   
-      $form['status']['rechazada'] = array(
+  $form['status']['rechazada'] = array(
     '#type' => 'select',
 	'#options' => $options,
     '#title' => t('Estado cuando la transaccion ha sido Rechazada'),
@@ -567,7 +634,7 @@ function commerce_todo_pago_settings_form($settings = NULL) {
     '#required' => FALSE,
   );
   
-      $form['status']['offline'] = array(
+  $form['status']['offline'] = array(
     '#type' => 'select',
 	'#options' => $options,
     '#title' => t('Estado cuando la transaccion ha sido Offline'),
@@ -593,17 +660,11 @@ function commerce_todo_pago_submit_form($payment_method, $pane_values, $checkout
 
   global $base_path;
   $form['bank_details'] = array(
- 
     '#markup' => '<p><img src="http://www.todopago.com.ar/sites/todopago.com.ar/files/pluginstarjeta.jpg"></p>',
  );
 
   return $form;
 }
-
-
-
-
-
 
 
 function commerce_todo_pago_admin_create_instance($field_name, $field_type, $required, $entity_type, $bundle, $label, $description = NULL, $weight = 0,$allow=array()) {

@@ -175,13 +175,18 @@ function call_SAR($connector, $order, $optionsSAR_comercio, $optionsSAR_operacio
 	$now = new DateTime();
 	_tranUpdate($order->order_id, array("first_step" => $now->format('Y-m-d H:i:s'), "params_SAR" => json_encode(array($optionsSAR_comercio, $optionsSAR_operacion)), "response_SAR" => json_encode($rta), "request_key" => $rta['RequestKey'], "public_request_key" => $rta['PublicRequestKey']));
 	
-	$form['#action'] = $rta["URL_Request"];
-    
-	$form['submit'] = array(
-			'#type' => 'submit',
-			'#value' => t('Continuar a Todo Pago'),
-			'#weight' => 50,
-	);
+	if($settings["general"]["form"] == '0') {
+		$form['#action'] = $rta["URL_Request"];
+		$form['submit'] = array(
+				'#type' => 'submit',
+				'#value' => t('Continuar a Todo Pago'),
+				'#weight' => 50,
+		);
+	} else {
+		$form['iframe'] = array(
+			'#markup' => '<iframe src="' . $base_path.drupal_get_path('module', 'commerce_todo_pago') .'/includes/formcustom.php?modo='.$modo.'&amount='.$optionsSAR_operacion["AMOUNT"].'&merchant='.$optionsSAR_operacion["MERCHANT"].'&prk=' . $rta['PublicRequestKey'] . '&order=' . $order->order_id . '&key='.$order->data['payment_redirect_key'].'" name="formcustom" scrolling="no" frameborder="0" width="490px" height="565px"></iframe>'
+        );
+	}
 	return $form;	
 }
 
@@ -229,7 +234,7 @@ function call_GAA($order, $ak)
 	
 	$now = new DateTime();
 	_tranUpdate($order, array("second_step" => $now->format('Y-m-d H:i:s'), "params_GAA" => json_encode($optionsGAA), "response_GAA" => json_encode($rta2), "answer_key" => $ak));
-	
+
 	return $rta2;	
 }
 
@@ -374,4 +379,68 @@ function push_notification($order_id,$ak)
 	echo "OK";	
 	
 }
+
+function get_credentials(){
+	//aca pongo la llamada para obtener la credenciales
+	/*$response = array(
+						"codigoResultado" => 1,
+						"merchandid" => 1234,
+						"apikey" => "TODOPAGO lkjasodj2ooii41i4j1",
+						"security" => "12312312312312312"
+					);*/
+
+	error_log("llega a la funcion",3,"C:/UwAmp/bin/apache/logs/php_error_log.log");
+
+	//return drupal_json_output($response);
+
+
+	/*if((isset($_POST['user']) && !empty($_POST['user'])) && (isset($_POST['pass']) && !empty($_POST['pass']))){
+
+		$userArray = array(
+						"user" => trim($_POST['user']), 
+						"password" => trim($_POST['pass'])
+						);
+
+		$http_header = array();
+
+		//ambiente developer por defecto	
+		$mode = 0;
+		if($_POST['mode'] == "production"){
+			$mode = 1;
+		}
+
+		try {
+			$connector = new Sdk($http_header, $mode);
+
+			$userInstance = new TodoPago\Data\User($userArray);
+
+		    $rta = $connector->getCredentials($userInstance);
+		    
+		    $security = explode(" ", $rta->getApikey());	
+
+			$response = array(	
+							"codigoResultado" => 1,
+							"merchandid" => $rta->getMerchant(),
+							"apikey" => $rta->getApikey(),
+							"security" => $security[1]
+						);
+
+		}catch(Exception $e){
+
+			$response = array(
+							"mensajeResultado" => $e->getMessage()
+						);
+		}
+		echo json_encode($response);
+
+	}else{
+
+		$response = array(	
+				"mensajeResultado" => "Ingrese usuario y contraseña de Todo Pago"
+		);		
+		echo json_encode($response);
+	}*/
+
+}
+
 
