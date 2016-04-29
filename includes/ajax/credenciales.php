@@ -1,5 +1,6 @@
 <?php
-	include(dirname(__FILE__).'\\..\\..\\vendor\\todopago\\php-sdk\\vendor\\autoload.php');
+	//include(dirname(__FILE__).'\\..\\..\\vendor\\todopago\\php-sdk\\vendor\\autoload.php');
+	include(dirname(__FILE__).'/../../vendor/todopago/php-sdk/vendor/autoload.php');
 	use TodoPago\Sdk;
 
 	if((isset($_POST['user']) && !empty($_POST['user'])) && (isset($_POST['pass']) && !empty($_POST['pass']))){
@@ -12,9 +13,9 @@
 		$http_header = array();
 
 		//ambiente developer por defecto	
-		$mode = 0;
+		$mode = "test";
 		if($_POST['mode'] == "Produccion"){
-			$mode = 1;
+			$mode = "prod";
 		}
 
 		try {

@@ -184,7 +184,7 @@ function call_SAR($connector, $order, $optionsSAR_comercio, $optionsSAR_operacio
 		);
 	} else {
 		$form['iframe'] = array(
-			'#markup' => '<iframe src="' . $base_path.drupal_get_path('module', 'commerce_todo_pago') .'/includes/formcustom.php?modo='.$modo.'&amount='.$optionsSAR_operacion["AMOUNT"].'&merchant='.$optionsSAR_operacion["MERCHANT"].'&prk=' . $rta['PublicRequestKey'] . '&order=' . $order->order_id . '&key='.$order->data['payment_redirect_key'].'" name="formcustom" scrolling="no" frameborder="0" width="490px" height="565px"></iframe>'
+			'#markup' => '<iframe src="' . $base_path.drupal_get_path('module', 'commerce_todo_pago') .'/includes/formcustom.php?modo='.$modo.'&amount='.$optionsSAR_operacion["AMOUNT"].'&merchant='.$optionsSAR_operacion["MERCHANT"].'&prk=' . $rta['PublicRequestKey'] . '&order=' . $order->order_id . '&key='.$order->data['payment_redirect_key'].'" name="formcustom" scrolling="no" frameborder="0" width="490px" height="606px"></iframe>'
         );
 	}
 	return $form;	

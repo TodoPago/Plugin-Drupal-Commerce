@@ -1,19 +1,24 @@
 <a name="inicio"></a>
-Drupal
+Drupal - módulo Todo Pago (v1.4.x a 1.5.x)
 ============
 
 Plug in para la integración con gateway de pago <strong>Todo Pago</strong>
 - [Consideraciones Generales](#consideracionesgenerales)
 - [Instalación](#instalacion)
 - [Configuración](#configuracion)
- - [Configuración plug in](#confplugin)
-- [Credenciales](#credenciales) 
-- [Datos adiccionales para prevención de fraude](#cybersource) 
-- [Consulta de transacciones](#constrans)
-- [Devoluciones](#devoluciones)
-- [Formulario de pago integrado](#formulario)
-- [Tablas de referencia](#tablas)
+	- [Configuración plug in](#confplugin)
+	- [Formulario de pago integrado](#formulario)
+	- [Obtener datos de configuracion](#getcredentials)
+	- [Nuevas columnas y atributos](#tca)
+- [Prevencion de Fraude](#cybersource)
+	- [Consideraciones generales](#cons_generales)
+	- [Consideraciones para vertical retail](#cons_retail)
+- [Características](#features)
+	- [Consulta de transacciones](#constrans)
+	- [Devoluciones](#devoluciones)
+- [Tablas de referencia](#tablasProv)
 - [Tabla de errores](#codigoerrores)
+- [Versiones disponibles](#availableversions)
 
 [](#consideracionesgenerales)
 ## Consideraciones Generales
@@ -31,9 +36,7 @@ El plug in de pagos de <strong>Todo Pago</strong>, provee a las tiendas Drupal C
 
 ![imagen de configuracion](https://raw.githubusercontent.com/TodoPago/imagenes/master/drupalcommerce/2-activacion.PNG)
 
-Observaci&oacute;n:
-
-Descomentar: <em>extension=php_curl.dll</em>, <em>extension=php_openssl.dll</em> y <em>extension=php_soap.dll</em> del php.ini, ya que para la conexión al gateway se utiliza la clase <em>SoapClient</em> del API de PHP.
+**Observaci&oacute;n:** <em>extension=php_curl.dll</em>, <em>extension=php_openssl.dll</em> y <em>extension=php_soap.dll</em> del php.ini, ya que para la conexión al gateway se utiliza la clase <em>SoapClient</em> del API de PHP.
 
 <br />
 [<sub>Volver a inicio</sub>](#inicio)
@@ -53,7 +56,19 @@ La configuracion del Plug in esta dividido en 4 solapas desplegables (GENERAL, A
 
 [<sub>Volver a inicio</sub>](#inicio)
 
-<a name="Credenciales"></a>
+<a name="formulario"></a>
+####Formulario de pago integrado
+El plugin tiene dos opciones de formulario para emplear en el proceso de pago. El formulario externo, que redirecciona a un formulario externo en Todo Pago y el fomulario integrado que permite hacer el pago dentro del e-commerce.<br>
+
+**Habilitar formulario hibrido**<br>
+En la pagina de configuracion de Todopago se puede encontrar el select "Formularion on-site", este permite activar el formulario externo o hibrido.
+![imagen devoluciones](https://raw.githubusercontent.com/TodoPago/imagenes/master/drupalcommerce/config-form-hibrido.png)<br />
+
+El formulario Hibrido se mostrara en la etapa final del proceso de pago "Confirmar pago". 
+
+[<sub>Volver a inicio</sub>](#inicio)
+
+<a name="getcredentials"></a>
 ####Credenciales
 En la secciones de ambientes de developers y produccion, se debe ingresar el MerchantID, Authorization y Security de Todo Pago.
 Estos se pueden obtener desde la pagina de Todo Pago o mediante el boton "Obtener credenciales".
@@ -65,47 +80,105 @@ Nota: El boton "Credenciales" se habilita si el ambiente en cuestion se encuentr
 
 [<sub>Volver a inicio</sub>](#inicio)
 
-<a name="cybersource"></a>
-## Prevención de Fraude
+<a name="tca"></a>
+#### Nuevas columnas y atributos
+El plug in creará nuevas tablas y registros en tablas existentes para lograr las nuevas funcionalidades y su persistencia dentro del framework 
 
-Consideraciones Generales (para todos los verticales, por defecto RETAIL)
-El plug in, toma valores estándar del framework para validar los datos del comprador. Principalmente se utiliza la variable global $user y la variable $profile que se accede con la consulta.
-commerce_customer_profile_load($order->commerce_customer_billing[LANGUAGE_NONE][0]['profile_id']);
-<br />
+#####Tablas:
+1. <i>todopago_transacciones</i>, para guardar un registro de las ordenes que utilizaron este método de pago.
+2. <i>todopago_productos</i>, para guardar la información necesaria en la [Prevención del Fraude](#cybersource).
+
+#####Registros:
+Los valores de configuración se encuentran guardados en la tabla <i>configuration</i>
+<br/>
+
 [<sub>Volver a inicio</sub>](#inicio)
 
-<a name="constrans"></a>
-## Consulta de Transacciones
+<a name="cybersource"></a>
+## Prevención de Fraude
+- [Consideraciones Generales](#cons_generales)
+- [Consideraciones para vertical RETAIL](#cons_retail)
+
+<a name="cons_generales"></a>
+####Consideraciones Generales (para todas los verticales, por defecto RETAIL)
+El plugin toma valores estándar del framework para validar los datos del comprador. Para ello se utilizan las clases Customer, Address y State para recuperar los registros almacenados en la base de datos que corresponden al cliente que efectúa la compra y Cart para recuperar el carrito en el que se almacena los datos relativos a la compra en sí.
+
+```php
+   $cart = $this->context->cart;
+   $customer = new Customer($cart->id_customer);
+   $address = new Address($cart->id_address_invoice);
+   $state = new State($address->id_state);
+
+-- Ciudad de Facturación: $address->city;
+-- País de facturación:  $address->country;
+-- Identificador de Usuario: $customer->id;
+-- Email del usuario al que se le emite la factura: $customer->email;
+-- Nombre de usuario el que se le emite la factura: $customer->firstname;
+-- Apellido del usuario al que se le emite la factura: $customer->lastname;
+-- Teléfono del usuario al que se le emite la factura: $address->phone;
+-- Provincia de la dirección de facturación: $state->iso_code;
+-- Domicilio de facturación: $address->address1;
+-- Moneda: $cart->id_currency;
+-- Total:  $cart->getOrderTotal(true, Cart::BOTH);
+-- IP de la pc del comprador: Tools::getRemoteAddr();
+```
+También se utiliza la clase <em>Customer</em> para obtener el password del usuario (comprador) y la tabla <em>Orders</em>, donde se consultan las transacciones facturadas al comprador.
+<a name="cons_retail"></a>
+####Consideraciones para vertical RETAIL
+Las consideración para el caso de empresas del rubro <strong>RETAIL</strong> son similares a las <em>consideraciones generales</em> con la diferencia de se utiliza el atributo id_address_delivery en lugar de id_address_invoice para recuperar el registro de la tabla address
+
+```php
+   $cart = $this->context->cart;
+   $customer = new Customer($cart->id_customer);
+   $address = new Address($cart->id_address_delivery);
+   $state = new State($address->id_state);
+   $carrier = new Carrier($cart->id_carrier);
+   
+-- Ciudad de envío de la orden: $address->city;
+-- País de envío de la orden: $address->country;
+-- Mail del destinatario: $customer->email;
+-- Nombre del destinatario: $customer->firstname;
+-- Apellido del destinatario: $customer->lastname;
+-- Número de teléfono del destinatario: $address->phone;
+-- Código postal del domicio de envío: $address->postcode;
+-- Provincia de envío: $state->iso_code;
+-- Domicilio de envío: $address->address1;
+-- Método de despacho: $carrier->name;
+-- Listado de los productos: $cart->getProducts();
+```
+nota: la funcion $cart->getProducts() devuelve un array con el listado de los productos, que se usan para conseguir la información que se debe enviar mediante la función <strong>_getProductsDetails()</strong>.
+
+####Muy Importante
+<strong>Provincias:</strong> uno de los datos requeridos para prevención común a todos los verticales  es el campo provinicia/state tanto del comprador como del lugar de envío, para tal fin el plug in utiliza el valor del campo id_state, que figura en el registro Address recuperado, para recuperar el objeto State correspondiente a ese id, y así obtener el iso_code. El formato de estos datos deben ser tal cual la tabla de referencia (tabla provincias). En Prestashop el listado se encuentra en Localización -> Provincias.
+<br />
+<strong>Celular:</strong> se utiliza el atributo phone_mobile del registro Address recuperado.
+[<sub>Volver a inicio</sub>](#inicio)
+
+<a name="features"></a>
+## Características
+ - [Consulta de transacciones](#constrans)
+ - [Devoluciones](#devoluciones)
+ 
+ <a name="constrans"></a>
+####Consulta de Transacciones
 El plugin genera un link para ver el estado de las transacciones,  para acceder hay que hacer click en “Todo Pago Status”
 
 ![imagen consulta de trnasacciones](https://raw.githubusercontent.com/TodoPago/imagenes/master/drupalcommerce/5-status%20de%20las%20operaciones.png)<br />
 [<sub>Volver a inicio</sub>](#inicio)
 
+
 <a name="devoluciones"></a>
-## Devolucinones
+####Devoluciones
 Es posible realizar devoluciones o reembolsos de las operaciones realizadas con Todo Pago. Para ello dirigirse a "Store Settings" -> "Todo Pago", allí deberá hacerse click en el link "Realizar una devolucion".
 ![imagen devoluciones](https://raw.githubusercontent.com/TodoPago/imagenes/master/drupalcommerce/drupaldevo.png)<br />
 
 [<sub>Volver a inicio</sub>](#inicio)
 
-<a name="formulario"></a>
-## Formulario de pago integrado
-El plugin tiene dos opciones de formulario para emplear en el proceso de pago. El formulario externo, que redirecciona a un formulario externo en Todo Pago y el fomulario integrado que permite hacer el pago dentro del e-commerce.<br>
 
-**Habilitar formulario hibrido**<br>
-En la pagina de configuracion de Todopago se puede encontrar el select "Formularion on-site", este permite activar el formulario externo o hibrido.
-![imagen devoluciones](https://raw.githubusercontent.com/TodoPago/imagenes/master/drupalcommerce/config-form-hibrido.png)<br />
-
-El formulario Hibrido se mostrara en la etapa final del proceso de pago "Confirmar pago". 
-
-[<sub>Volver a inicio</sub>](#inicio)
-
-<a name="tablas"></a>
+<a name="tablasProv"></a>
 ## Tablas de Referencia
 ######[Provincias](#p)
 
-<a name="p"></a>
-<p>Provincias</p>
 <table>
 <tr><th>Provincia</th><th>Código</th></tr>
 <tr><td>CABA</td><td>C</td></tr>
@@ -133,6 +206,7 @@ El formulario Hibrido se mostrara en la etapa final del proceso de pago "Confirm
 <tr><td>Tierra del Fuego</td><td>V</td></tr>
 <tr><td>Tucumán</td><td>T</td></tr>
 </table>
+
 [<sub>Volver a inicio</sub>](#inicio)
 
 <a name="codigoerrores"></a>    
@@ -188,6 +262,28 @@ El formulario Hibrido se mostrara en la etapa final del proceso de pago "Confirm
 <tr><td>99997</td><td>Lo sentimos, en este momento la operación no puede ser realizada. Por favor intentá más tarde.</td></tr>
 <tr><td>99998</td><td>Lo sentimos, la operación fue rechazada. Comunicate con la entidad emisora de la tarjeta para verificar el incoveniente o seleccioná otro medio de pago.</td></tr>
 <tr><td>99999</td><td>Lo sentimos, la operación no pudo completarse. Comunicate con la entidad emisora de la tarjeta para verificar el incoveniente o seleccioná otro medio de pago.</td></tr>
+</table>
+
+[<sub>Volver a inicio</sub>](#inicio)
+
+<a name="availableversions"></a>
+## Versiones Disponibles##
+<table>
+  <thead>
+    <tr>
+      <th>Version del Plugin</th>
+      <th>Estado</th>
+      <th>Versiones Compatibles</th>
+    </tr>
+  <thead>
+  <tbody>
+    <tr>
+      <td><a href="/TodoPago/Plugin-Drupal-Commerce/archive/master.zip">v1.4.x - v1.5.x</a></td>
+      <td>Stable (Current version)</td>
+      <td>Drupal 7 - Drupal Commerce 1.11<br />
+      </td>
+    </tr>
+  </tbody>
 </table>
 
 [<sub>Volver a inicio</sub>](#inicio)
