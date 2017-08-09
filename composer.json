@@ -1,5 +1,6 @@
 {
     "require": {
-        "todopago/php-sdk": "^1.2"
+        "todopago/php-sdk": "^1.2",
+        "apache/log4php": "^2.3"
     }
 }

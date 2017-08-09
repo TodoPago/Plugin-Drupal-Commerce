@@ -5,11 +5,11 @@ include_once(drupal_get_path('module', 'commerce_todo_pago').'/includes/ControlF
 include_once(drupal_get_path('module', 'commerce_todo_pago').'/includes/Logger/logger.php');
 
 function TPLog($order = null, $user = null, $endpoint = null) {
-	
+
 	$logger = new TodoPagoLogger();
 	$logger->setPhpVersion(phpversion());
 	$logger->setCommerceVersion(VERSION);
-	$logger->setPluginVersion("1.3.1");
+	$logger->setPluginVersion("1.9.0");
 	$payment = false;
 	if($order != null)
 		$payment = true;
@@ -25,25 +25,25 @@ function TPLog($order = null, $user = null, $endpoint = null) {
 
 function _phoneSanitize($number){
 	$number = str_replace(array(" ","(",")","-","+"),"",$number);
-	
+
 	if(substr($number,0,2)=="54") return $number;
-	
+
 	if(substr($number,0,2)=="15"){
 		$number = substr($number,2,strlen($number));
 	}
 	if(strlen($number)==8) return "5411".$number;
-	
+
 	if(substr($number,0,1)=="0") return "54".substr($number,1,strlen($number));
 	return $number;
 }
-	
+
 function _tranEstado($oid)
 {
 	$res = db_query("SELECT * FROM {todopago_transaccion} WHERE id_orden=".$oid);
 	$res = $res->fetchAssoc();
 	if(!$res) {
 		return 0;
-	} else {	
+	} else {
 		if($res['first_step'] == null) {
 			return 1;
 		} else if ($res['second_step'] == null) {
@@ -85,8 +85,8 @@ function _tranResult($oid)
 
 function prepare_order($order)
 {
-	if(_tranEstado($order->order_id) == 0) 
-		_tranCrear($order->order_id);	
+	if(_tranEstado($order->order_id) == 0)
+		_tranCrear($order->order_id);
 }
 
 function get_paydata($order, $user, $form, $payment_method)
@@ -98,32 +98,32 @@ function get_paydata($order, $user, $form, $payment_method)
 			break;
 		case "Ticketing":
 			$vertical = ControlFraudeFactory::TICKETING;
-			break;		
+			break;
 		case "Services":
 			$vertical = ControlFraudeFactory::SERVICE;
-			break;		
+			break;
 		case "Digital_Goods":
 			$vertical = ControlFraudeFactory::DIGITAL_GOODS;
-			break;		
+			break;
 	}
 	$dataFraude = ControlFraudeFactory::get_controlfraude_extractor($vertical, $user, $order)->getDataCS();
-	
+
 	$form = array_merge($form,$dataFraude);
-	
+
 	 foreach($form as $key=>$value){
-		$optionsSAR_operacion[$key] =$value["#value"];   
+		$optionsSAR_operacion[$key] =$value["#value"];
 	 }
-	
+
 	$monto= commerce_currency_amount_to_decimal($order->commerce_order_total[LANGUAGE_NONE][0]["amount"],$order->commerce_order_total[LANGUAGE_NONE][0]["currency_code"]);
 
 	$settings = $payment_method["settings"];
 
     if ($settings["general"]["modo"] == "Produccion"){
-        $modo = "ambienteproduccion";
+        $modo = "prod";
     }else{
-         $modo = "ambientetest";
+         $modo = "test";
     }
-	
+
 	$optionsSAR_comercio = array (
 		'Security'=>$settings[$modo]["security"],
 		'EncodingMethod'=>'XML',
@@ -137,31 +137,43 @@ function get_paydata($order, $user, $form, $payment_method)
 	$optionsSAR_operacion["CURRENCYCODE"]	=032;
 	$optionsSAR_operacion["AMOUNT"]	=$monto;
 
-	//creo el conector con el valor de Authorization, la direccion de WSDL y endpoint que corresponda	
+	if( isset($payment_method["settings"]["general"]["maxinstallments_enabled"]) 
+		&& $payment_method["settings"]["general"]["maxinstallments_enabled"] == 1  )
+	{
+        $optionsSAR_operacion['MAXINSTALLMENTS'] = ($payment_method["settings"]["general"]["maxinstallments"] > 0 && $payment_method["settings"]["general"]["maxinstallments"] <= 12 )? $payment_method["settings"]["general"]["maxinstallments"]:12;
+    }
+ 
+    if( isset($payment_method["settings"]["general"]["timeout_enabled"]) 
+    	&& $payment_method["settings"]["general"]["timeout_enabled"] == 1  )
+    {
+        $optionsSAR_operacion['TIMEOUT'] = (intval($payment_method["settings"]["general"]["timeout"]) > 0)? $payment_method["settings"]["general"]["timeout"]:1800000;
+    }
+
+	//creo el conector con el valor de Authorization, la direccion de WSDL y endpoint que corresponda
 	$connector = get_connector($settings);
-	
+
 	return array($connector, $optionsSAR_comercio, $optionsSAR_operacion);
 }
 
 function call_SAR($connector, $order, $optionsSAR_comercio, $optionsSAR_operacion, $payment_method, $form, $form_state)
 {
 	global $user;
-	
 	TPLog($order->order_id, $user->uid, $payment_method["settings"]["general"]["modo"])->info("params SAR ".json_encode(array($optionsSAR_comercio, $optionsSAR_operacion)));
 	$rta = $connector->sendAuthorizeRequest($optionsSAR_comercio, $optionsSAR_operacion);
+
 	TPLog($order->order_id, $user->uid, $payment_method["settings"]["general"]["modo"])->info("response SAR ".json_encode($rta));
-	
+
 	$settings = $payment_method["settings"];
 	if ($settings["general"]["modo"] == "Produccion"){
-		$modo = "ambienteproduccion";
+		$modo = "prod";
 	}else{
-		$modo = "ambientetest";
+		$modo = "test";
 	}
-	
+
 	if ($rta['StatusCode']  != -1)//Si la transacción salió mal
 	{
 		if(($rta['StatusCode']  == 702)&&(!property_exists($order,"first_step"))) {
-			$authorization = json_decode($settings["general"]["authorization"],1);
+			$authorization = json_decode($settings[$modo]["authorization"],1);
 			$merchant = $settings[$modo]["idsite"];
 			$security = $settings[$modo]["security"];
 			if((isset($authorization["Authorization"]))&&(!empty($merchant))&&(!empty($security))){
@@ -169,12 +181,13 @@ function call_SAR($connector, $order, $optionsSAR_comercio, $optionsSAR_operacio
 				first_step_todopago($form, $form_state, $order, $payment_method);
 			}
 		}
-		throw new Exception($rta['StatusMessage']);
+
+		throw new Exception($statusMessage);
 	}
 
 	$now = new DateTime();
 	_tranUpdate($order->order_id, array("first_step" => $now->format('Y-m-d H:i:s'), "params_SAR" => json_encode(array($optionsSAR_comercio, $optionsSAR_operacion)), "response_SAR" => json_encode($rta), "request_key" => $rta['RequestKey'], "public_request_key" => $rta['PublicRequestKey']));
-	
+
 	if($settings["general"]["form"] == '0') {
 		$form['#action'] = $rta["URL_Request"];
 		$form['submit'] = array(
@@ -184,79 +197,115 @@ function call_SAR($connector, $order, $optionsSAR_comercio, $optionsSAR_operacio
 		);
 	} else {
 		$form['iframe'] = array(
-			'#markup' => '<iframe src="' . $base_path.drupal_get_path('module', 'commerce_todo_pago') .'/includes/formcustom.php?modo='.$modo.'&amount='.$optionsSAR_operacion["AMOUNT"].'&merchant='.$optionsSAR_operacion["MERCHANT"].'&prk=' . $rta['PublicRequestKey'] . '&order=' . $order->order_id . '&key='.$order->data['payment_redirect_key'].'" name="formcustom" scrolling="no" frameborder="0" width="490px" height="606px"></iframe>'
+			'#markup' => '<iframe src="' . base_path() . drupal_get_path('module', 'commerce_todo_pago') .'/includes/formcustom.php?modo='.$modo.'&amount='.$optionsSAR_operacion["AMOUNT"].'&merchant='.$optionsSAR_operacion["MERCHANT"].'&prk=' . $rta['PublicRequestKey'] . '&order=' . $order->order_id . '&key='.$order->data['payment_redirect_key'].'" name="formcustom" scrolling="no" frameborder="0" width="490px" height="900px"></iframe>'
         );
 	}
-	return $form;	
+	return $form;
 }
 
 function first_step_todopago($form, &$form_state, $order, $payment_method)
 {
 	global $pane_values,$user;
 	TPLog($order->order_id, $user->uid, $payment_method["settings"]["general"]["modo"])->info('first step');
-	
+
 	prepare_order($order);
 	list($connector, $optionsSAR_comercio, $optionsSAR_operacion) = get_paydata($order, $user, $form, $payment_method);
-	
+
 	return call_SAR($connector, $order, $optionsSAR_comercio, $optionsSAR_operacion, $payment_method, $form, $form_state);
 }
 
 function call_GAA($order, $ak)
 {
 	global $user;
-	
+
 	if(_tranEstado($order) != 2)
 	{
 		throw new Exception("second_step ya realizado");
-	}	
+	}
     $payment_method = commerce_payment_method_instance_load('bank_transfer|commerce_payment_bank_transfer');
     $settings = $payment_method["settings"];
 	$oOrder = commerce_order_load($order);
-	
+
     if ($settings["general"]["modo"] == "Produccion"){
-        $modo = "ambienteproduccion";
+        $modo = "prod";
     }else{
-         $modo = "ambientetest";
+         $modo = "test";
     }
-	
-    $optionsGAA = array (     
+
+    $optionsGAA = array (
         'Security'=>$settings[$modo]["security"],
-    	'Merchant'=>$settings[$modo]["idsite"],   
-        'RequestKey' => _tranRK($order),       
-        'AnswerKey'  => $ak      
-    );  
-	
+    	'Merchant'=>$settings[$modo]["idsite"],
+        'RequestKey' => _tranRK($order),
+        'AnswerKey'  => $ak
+    );
+
 	$connector = get_connector($settings);
 
 	TPLog($order, $oOrder->uid, $payment_method["settings"]["general"]["modo"])->info('params GAA '.json_encode($optionsGAA));
     $rta2 = $connector->getAuthorizeAnswer($optionsGAA);
 	TPLog($order, $oOrder->uid, $payment_method["settings"]["general"]["modo"])->info('response GAA '.json_encode($rta2));
-	
+
 	$now = new DateTime();
 	_tranUpdate($order, array("second_step" => $now->format('Y-m-d H:i:s'), "params_GAA" => json_encode($optionsGAA), "response_GAA" => json_encode($rta2), "answer_key" => $ak));
 
-	return $rta2;	
+	return $rta2;
 }
 
 function take_action($order, $rta2)
-{
+{	
     $order = commerce_order_load($order);
     $payment_method = commerce_payment_method_instance_load('bank_transfer|commerce_payment_bank_transfer');
     $settings = $payment_method["settings"];
-	
+
     if ($rta2["StatusCode"]=="-1"){
+        commerce_cart_order_empty($order);
         $status = $settings["status"]["aprobada"];
         $transaction = commerce_payment_transaction_new('bank_transfer', $order->order_id);
         $transaction->instance_id = $payment_method['instance_id'];
-        $transaction->amount = $rta2["Payload"]["Request"]["AMOUNT"]*100;
+        $transaction->amount = $rta2["Payload"]["Request"]["AMOUNTBUYER"]*100;
         $transaction->status = COMMERCE_PAYMENT_STATUS_SUCCESS;
         $transaction->payload = print_r($rta2["Payload"],1);
         $transaction->remote_id = $rta2["Payload"]["Answer"]["OPERATIONID"];
         commerce_payment_transaction_save($transaction);
         commerce_order_status_update($order, $status);
+
+		$default_currency_code = commerce_default_currency();
+		if ($balance = commerce_payment_order_balance($order)) {
+			$default_currency_code = $balance['currency_code'];
+		}
+
+		// Create the new line item.
+		$line_item = commerce_line_item_new('product', $order->order_id);
+		$line_item->line_item_label = 'Otros Cargos';
+	 	$line_item->quantity = 1;
+		$line_item->commerce_unit_price[LANGUAGE_NONE][0]['amount'] = $rta2["Payload"]["Request"]["AMOUNTBUYER"]*100 - $rta2["Payload"]["Request"]["AMOUNT"]*100;
+		$line_item->commerce_unit_price[LANGUAGE_NONE][0]['currency_code'] = $default_currency_code;
+		rules_invoke_event('commerce_product_calculate_sell_price', $line_item);
+		$line_item_wrapper = entity_metadata_wrapper("commerce_line_item", $line_item);
+		$line_item_wrapper->commerce_unit_price->data = commerce_price_component_add(
+		    $line_item_wrapper->commerce_unit_price->value(),
+		    'base_price',
+		    array(
+	        	    'amount' => $rta2["Payload"]["Request"]["AMOUNTBUYER"]*100 - $rta2["Payload"]["Request"]["AMOUNT"]*100,
+		            'currency_code' => $default_currency_code,
+		            'data' => array(),
+		    ),
+		    TRUE
+		);
+
+        $line_item_wrapper->save();
+		commerce_line_item_save($line_item);
+
+        $order_wrapper = entity_metadata_wrapper('commerce_order', $order);
+        $order_wrapper->commerce_line_items[] = $line_item;
+        $order_wrapper->save();
+
+		commerce_order_calculate_total($order);
+        $order_wrapper->save();
+
         drupal_goto(commerce_checkout_order_uri($order));
     }else{
-        if ($rta2["Payload"]["Answer"]["BARCODETYPE"] !=""){
+        if (isset($rta2["Payload"]) && $rta2["Payload"]["Answer"]["BARCODETYPE"] !=""){
             $transaction = commerce_payment_transaction_new('bank_transfer', $order->order_id);
             $transaction->instance_id = $payment_method['instance_id'];
             $transaction->amount = $rta2["Payload"]["Request"]["AMOUNT"]*100;
@@ -265,14 +314,14 @@ function take_action($order, $rta2)
             $transaction->remote_id = $rta2["Payload"]["Answer"]["OPERATIONID"];
             commerce_payment_transaction_save($transaction);
             $status = $settings["status"]["offline"];
-?>
-        
+			?>
+
             <div id="content" style="width: 75%;">
 	     	<div><div class="titulos">Nro de Operaci&oacute;n:</div><em><strong><?php echo $order->order_id ?></strong></em><hr></div>
             <div><div class="titulos">Total a pagar</div>$ <?php echo $rta2["Payload"]["Request"]["AMOUNT"].".-" ?><hr></div>
         	<div class="titulos"><h3>DATOS PERSONALES<h3><hr></div>
 	        <div><div class="titulos">Nombre</div> <?php echo $user->name?> <hr></div>
-<?php 
+			<?php
             if ($rta2["Payload"]["Answer"]["PAYMENTMETHODNAME"] == "PAGOFACIL"){
                 $empresa = "PAGO FACIL";
             }else{
@@ -282,67 +331,72 @@ function take_action($order, $rta2)
             if (!empty($rta2["Payload"]["Answer"]["BARCODE"])){
                $barcode = $rta2["Payload"]["Answer"]["BARCODE"];
             }
-?>
+			?>
 	       <div><div class="titulos">Podr&aacute;s pagar este cup&oacute;n en los locales de:</div><?php echo $empresa ?><hr></div>
-<?php
-            echo "<img   src='".$base_path.drupal_get_path('module', 'commerce_todo_pago')."/includes/image.php?filetype=PNG&dpi=72&scale=5&rotation=0&font_family=Arial.ttf&font_size=8&text=".$barcode."&thickness=30&checksum=&code=BCGi25&' />";
+			<?php
+            echo "<img   src='".base_path().drupal_get_path('module', 'commerce_todo_pago')."/includes/image.php?filetype=PNG&dpi=72&scale=5&rotation=0&font_family=Arial.ttf&font_size=8&text=".$barcode."&thickness=30&checksum=&code=BCGi25&' />";
 
-?>
-            <br /> 
+			?>
+            <br />
             	<div class="right">
             		<input type="button" name="imprimir" value="Imprimir" onclick="window.print();" class="button">
             		<a href="<?php echo commerce_checkout_order_uri($order)?>">Click aca para continuar.</a>
             	</div>
             	<br />
             </div>
-<?php
+			<?php
             commerce_order_status_update($order, $status);
         }else{
 			_tranUpdate($order->order_id, array("first_step" => null, "second_step" => null));
-			if($rta2["StatusCode"]==404) {
-				drupal_goto('<front>');
-				return;
-			}
+
             $status = $settings["status"]["rechazada"];
-            commerce_order_status_update($order, $status);
-            drupal_set_message(t('Hubo un error en la transaccion, intente nuevamente'), 'error');
-            commerce_payment_redirect_pane_previous_page($order);
+
+            if ($settings["general"]['emptycart_enabled'] == "1"){
+                commerce_cart_order_empty($order);
+                commerce_payment_redirect_pane_previous_page($order);
+                commerce_order_status_update($order, $status);
+
+            } else {
+                commerce_payment_redirect_pane_previous_page($order);
+            }
+
+            drupal_set_message(t($rta2['StatusMessage']), 'error');
             drupal_goto(commerce_checkout_order_uri($order));
-        }   
-    }	
+        }
+    }
 }
 
 function second_step_todopago($order, $return, $user, $ak)
 {
 	$payment_method = commerce_payment_method_instance_load('bank_transfer|commerce_payment_bank_transfer');
-	
+
 	$oOrder = commerce_order_load($order);
     TPLog($order, $oOrder->uid, $payment_method["settings"]["general"]["modo"])->info('second step');
-	
+
 	$rta = call_GAA($order, $ak);
-	
+
 	return take_action($order, $rta);
-	
+
 }
 
 function get_payment_methods($payment_method)
 {
 	$settings = $payment_method;
 	$connector = get_connector($settings);
-	
+
 	return $connector->discoverPaymentMethods();
 }
 
-function get_connector($settings) 
+function get_connector($settings)
 {
-	
+
 	$mode = ($settings["general"]["modo"] == "Produccion")?"prod":"test";
-    $http_header = json_decode($settings["general"]["authorization"],1);
+    $http_header = json_decode($settings[$mode]["authorization"],1);
 	if($http_header == null) {
-		$http_header = array("Authorization" => $settings["general"]["authorization"]);
+		$http_header = array("Authorization" => $settings[$mode]["authorization"]);
 	}
 	$connector = new Sdk($http_header, $mode);
-	
+
 	return $connector;
 }
 
@@ -356,7 +410,7 @@ if (!function_exists('http_response_code'))
             header('X-PHP-Response-Code: '.$newcode, true, $newcode);
             if(!headers_sent())
                 $code = $newcode;
-        }       
+        }
         return $code;
     }
 }
@@ -364,83 +418,21 @@ if (!function_exists('http_response_code'))
 function push_notification($order_id,$ak)
 {
 	$transaccion = _tranResult($order_id);
-	
+
 	if(!$transaccion) {
 		http_response_code(404);
 		return;
 	}
-	
+
 	if($transaccion["answer_key"] != $ak) {
 		http_response_code(400);
 		return;
 	}
-	
+
 	//Actualizar order status
-	echo "OK";	
-	
+	echo "OK";
+
 }
 
 function get_credentials(){
-	//aca pongo la llamada para obtener la credenciales
-	/*$response = array(
-						"codigoResultado" => 1,
-						"merchandid" => 1234,
-						"apikey" => "TODOPAGO lkjasodj2ooii41i4j1",
-						"security" => "12312312312312312"
-					);*/
-
-	error_log("llega a la funcion",3,"C:/UwAmp/bin/apache/logs/php_error_log.log");
-
-	//return drupal_json_output($response);
-
-
-	/*if((isset($_POST['user']) && !empty($_POST['user'])) && (isset($_POST['pass']) && !empty($_POST['pass']))){
-
-		$userArray = array(
-						"user" => trim($_POST['user']), 
-						"password" => trim($_POST['pass'])
-						);
-
-		$http_header = array();
-
-		//ambiente developer por defecto	
-		$mode = 0;
-		if($_POST['mode'] == "production"){
-			$mode = 1;
-		}
-
-		try {
-			$connector = new Sdk($http_header, $mode);
-
-			$userInstance = new TodoPago\Data\User($userArray);
-
-		    $rta = $connector->getCredentials($userInstance);
-		    
-		    $security = explode(" ", $rta->getApikey());	
-
-			$response = array(	
-							"codigoResultado" => 1,
-							"merchandid" => $rta->getMerchant(),
-							"apikey" => $rta->getApikey(),
-							"security" => $security[1]
-						);
-
-		}catch(Exception $e){
-
-			$response = array(
-							"mensajeResultado" => $e->getMessage()
-						);
-		}
-		echo json_encode($response);
-
-	}else{
-
-		$response = array(	
-				"mensajeResultado" => "Ingrese usuario y contraseña de Todo Pago"
-		);		
-		echo json_encode($response);
-	}*/
-
 }
-
-

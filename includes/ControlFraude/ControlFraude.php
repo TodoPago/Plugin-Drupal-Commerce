@@ -29,7 +29,7 @@ abstract class ControlFraude {
 		$datosCS["CSBTCITY"] 			= substr($this->getField($this->datasources['profile'],'commerce_customer_address','locality'),0,250);
 		$datosCS["CSBTCOUNTRY"] 		= $this->getField($this->datasources['profile'],'commerce_customer_address','country');
 		$datosCS["CSBTCUSTOMERID"] 		= $this->getField($this->datasources['profile'],"uid");
-		$datosCS["CSBTIPADDRESS"] 		= $this->getField($this->datasources['user'],"hostname");
+		$datosCS["CSBTIPADDRESS"] 		= ($this->get_the_user_ip() == '::1') ? '127.0.0.1' : $this->get_the_user_ip();
 		$datosCS["CSBTEMAIL"] 			= $this->getField($this->datasources['order'],"mail");
 		$datosCS["CSBTFIRSTNAME"] 		= $this->getField($this->datasources['profile'],'todo_pago_nombre','value');
 		$datosCS["CSBTLASTNAME"] 		= $this->getField($this->datasources['profile'],'todo_pago_apellido','value');
@@ -181,4 +181,18 @@ abstract class ControlFraude {
     {
         return date_diff(DateTime::createFromFormat("U",$fecha), new DateTime())->format('%a');
     }
+
+    public function get_the_user_ip() {
+        if ( ! empty( $_SERVER['HTTP_CLIENT_IP'] ) ) {
+            //check ip from share internet
+            $ip = $_SERVER['HTTP_CLIENT_IP'];
+        } elseif ( ! empty( $_SERVER['HTTP_X_FORWARDED_FOR'] ) ) {
+            //to check ip is pass from proxy
+            $ip = $_SERVER['HTTP_X_FORWARDED_FOR'];
+        } else {
+            $ip = $_SERVER['REMOTE_ADDR'];
+        }
+        return $ip;
+    }
+
 }

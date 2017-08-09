@@ -12,11 +12,11 @@ jQuery(document).ready(function($) {
 	jQuery("#login-credencial").click(function(){
 
 		if(ambiente == "Produccion"){
-			positioinTop = jQuery("#edit-parameter-payment-method-settings-payment-method-settings-ambienteproduccion").offset().top - 250;
-			jQuery("#edit-parameter-payment-method-settings-payment-method-settings-ambienteproduccion-idsite").focus();
+			positioinTop = jQuery("#edit-parameter-payment-method-settings-payment-method-settings-prod").offset().top - 250;
+			jQuery("#edit-parameter-payment-method-settings-payment-method-settings-prod-idsite").focus();
 		}else{
-			positioinTop = jQuery("#edit-parameter-payment-method-settings-payment-method-settings-ambientetest").offset().top - 250;
-			jQuery("#edit-parameter-payment-method-settings-payment-method-settings-ambientetest-idsite").focus();
+			positioinTop = jQuery("#edit-parameter-payment-method-settings-payment-method-settings-test").offset().top - 250;
+			jQuery("#edit-parameter-payment-method-settings-payment-method-settings-test-idsite").focus();
 		}
 
 		jQuery("#error_message").html("").hide();
@@ -44,17 +44,18 @@ jQuery(document).ready(function($) {
 
 		 		}else if(response.codigoResultado == 1){
 		 			if(ambiente == "Produccion"){
-						jQuery("#edit-parameter-payment-method-settings-payment-method-settings-ambienteproduccion-idsite").val(response.merchandid);
-		 				jQuery("#edit-parameter-payment-method-settings-payment-method-settings-ambienteproduccion-security").val(response.security);
-		 				logPositioinTop = jQuery("#edit-parameter-payment-method-settings-payment-method-settings-ambientetest-idsite").offset().top - 150;
+						jQuery("#edit-parameter-payment-method-settings-payment-method-settings-prod-idsite").val(response.merchandid);
+		 				jQuery("#edit-parameter-payment-method-settings-payment-method-settings-prod-security").val(response.security);
+		 				jQuery("#edit-parameter-payment-method-settings-payment-method-settings-prod-authorization").val(response.apikey);
+		 				logPositioinTop = jQuery("#edit-parameter-payment-method-settings-payment-method-settings-prod-idsite").offset().top - 150;
 			        }else{
-			        	jQuery("#edit-parameter-payment-method-settings-payment-method-settings-ambientetest-idsite").val(response.merchandid);
-		 				jQuery("#edit-parameter-payment-method-settings-payment-method-settings-ambientetest-security").val(response.security);
-		 				logPositioinTop = jQuery("#edit-parameter-payment-method-settings-payment-method-settings-ambientetest-idsite").offset().top - 300;
+			        	jQuery("#edit-parameter-payment-method-settings-payment-method-settings-test-idsite").val(response.merchandid);
+		 				jQuery("#edit-parameter-payment-method-settings-payment-method-settings-test-security").val(response.security);
+		 				jQuery("#edit-parameter-payment-method-settings-payment-method-settings-test-authorization").val(response.apikey);
+		 				logPositioinTop = jQuery("#edit-parameter-payment-method-settings-payment-method-settings-test-idsite").offset().top - 300;
 			        }
 
-			        jQuery("#edit-parameter-payment-method-settings-payment-method-settings-general-authorization").val(response.apikey);
-
+			    //    jQuery("#edit-parameter-payment-method-settings-payment-method-settings-general-authorization").val(response.apikey);
 					$('html, body').animate({
 					    scrollTop: logPositioinTop
 					}, 400);

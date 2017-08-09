@@ -1,6 +1,6 @@
 <html>
 <head>
-	<?php if($_GET["modo"] == "ambientetest"){ ?>		
+	<?php if($_GET["modo"] == "test"){ ?>
 		<script src='https://developers.todopago.com.ar/resources/TPHybridForm-v0.1.js'></script>
 	<?php }else{ ?>
 		<script src='https://forms.todopago.com.ar/resources/TPHybridForm-v0.1.js'></script>
@@ -40,6 +40,12 @@
 						<div class="clear"></div>
 					</div>
 				</div>
+				<!-- Para los casos en el que el comercio opera con PEI -->
+				<div class="form-row tp-no-cupon">
+					<label id="labelPeiCheckboxId"></label>
+					<input id="peiCbx"/>
+				</div>
+
 				<div class="field">
 					<label for="numeroTarjetaTxt" class="tp-label required spacer"><em>*</em>Número de Tarjeta</label>
 					<div class="input-box">
@@ -59,10 +65,9 @@
 					</div>
 				</div>
 				<div class="field">
-					<label for="codigoSeguridadTxt" class="tp-label required spacer"><em>*</em>Código de Seguridad</label>
+					<label for="codigoSeguridadTxt" id="labelCodSegTextId" class="tp-label required spacer"><em>*</em>Código de Seguridad</label>
 					<div class="input-box">
 						<input id="codigoSeguridadTxt" class="left input-text required-entry small"/>
-						<label id="labelCodSegTextId" class="left tp-label spacer"></label>
 						<span class="error" id="codigoSeguridadTxtError"></span>
 						<div class="clear"></div>
 					</div>
@@ -80,7 +85,7 @@
 						<div class="input-box">
 							<select id="tipoDocCbx" class="left"></select>
 							<span class="left spacer">&nbsp;</span>
-							<input id="nroDocTxt" class="left input-text required-entry" />	
+							<input id="nroDocTxt" class="left input-text required-entry" />
 						</div>
 						<div class="clear"></div>
 						<span class="error" id="nroDocTxtError"></span>
@@ -93,18 +98,17 @@
 						<span class="error" id="emailTxtError"></span>
 					</div>
 				</div>
+				<div><!-- Para los casos en el que el comercio opera con PEI -->
+			    	<label id="labelPeiTokenTextId"></label>
+					<input id="peiTokenTxt"/>
+				</div>
 				<div id="tp-bt-wrapper">
 					<button id="MY_btnConfirmarPago" title="Pagar" class="button"><span>Pagar</span></button>
-				</div>
-			</div>	
+					<button id='MY_btnPagarConBilletera' title="Pagar con billetera virtual" class='button'><span>Pagar con billetera virtual</span></button>
+			</div>
 		</div>
 
 	</div>
-<?php
-
-	//aca ponco la consula la base de datos a partir de orden id
-	
-?>
 
 	<script>
 		var order = "<?php echo $_GET['order']?>";
@@ -114,11 +118,10 @@
 		var completeName = "";
 		var dni = 'Numero de documento';
 		var defDniType = 'DNI';
-		
-		url = window.location.pathname;	
+
+		url = window.location.pathname;
 		base = url.split("/");
-		url_base = location.protocol + "//" + location.host + "/" + base[1] + "/?q=commerce/todopago/notification/";
-		console.log(url_base);
+		url_base = "<?php  echo $url = preg_replace('/\?.*/', '',  $_SERVER['HTTP_REFERER']); ?>" + "?q=commerce/todopago/notification/";
 
 		/************* CONFIGURACION DEL API ************************/
 		window.TPFORMAPI.hybridForm.initForm({
@@ -129,10 +132,12 @@
 			afterRequest: 'stopLoading',
 			callbackCustomSuccessFunction: 'customPaymentSuccessResponse',
 			callbackCustomErrorFunction: 'customPaymentErrorResponse',
+			callbackBilleteraFunction: 'billeteraPaymentResponse',
+ 			botonPagarConBilleteraId: 'MY_btnPagarConBilletera',
 			botonPagarId: 'MY_btnConfirmarPago',
 			codigoSeguridadTxt: 'Codigo',
 		});
-		
+
 		window.TPFORMAPI.hybridForm.setItem({
 			publicKey: security,
             defaultNombreApellido: completeName,
@@ -141,16 +146,27 @@
             defaultTipoDoc: defDniType
 		});
 		//callbacks de respuesta del pago
-		function validationCollector(parametros) {
-			$("#"+parametros.field).addClass("error");
-			$("#"+parametros.field+"Error").html("<span class='error'>"+parametros.error+"</span>");
+		function validationCollector(response) {
+			$("#"+response.field).addClass("error");
+			$("#"+response.field+"Error").html("<span class='error'>"+response.error+"</span>");
 		}
 
+		function billeteraPaymentResponse(response) {
+			if(response.AuthorizationKey){
+				window.top.location = url_base + order + "/" + key + "?Answer=" + response.AuthorizationKey;
+			}else{
+				window.top.location = url_base + order + "/" + key + "?Error=" + response.ResultMessage;
+			}
+		}
 		function customPaymentSuccessResponse(response) {
 			window.top.location = url_base + order + "/" + key + "?Answer=" + response.AuthorizationKey;
 		}
 		function customPaymentErrorResponse(response) {
-			window.top.location = url_base + order + "/" + key + "?Answer=false";
+			if(response.AuthorizationKey){
+				window.top.location = url_base + order + "/" + key + "?Answer=" + response.AuthorizationKey;
+			}else{
+				window.top.location = url_base + order + "/" + key + "?Error=" + response.ResultMessage;
+			}
 		}
 
 		function initLoading() {
@@ -160,5 +176,6 @@
 		function stopLoading() {
 			console.log('Stop loading...');
 		}
+
 	</script>
 </body></html>

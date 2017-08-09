@@ -2,7 +2,6 @@
 include(drupal_get_path('module', 'commerce_todo_pago').'/vendor/autoload.php');
 include(drupal_get_path('module', 'commerce_todo_pago').'/includes/commerce_todo_pago_general.php');
 
-
 function commerce_todo_pago_init() {
 
 
@@ -16,29 +15,34 @@ function commerce_todo_pago_init() {
     drupal_add_js(array('TPmodule' => $properties), 'setting');
 }
 
-function commerce_todo_pago_block_view(){ 
+function commerce_todo_pago_block_view(){
   global $base_path;
+
   drupal_add_js($base_path.drupal_get_path('module', 'commerce_todo_pago') .'/includes/todopago.js', array("type"=>"file","requires_jquery"=> TRUE));
 }
 
+
+
 function commerce_todo_pago_form_alter(&$form, $form_state, $form_id) {
   global $base_path;
+
   if($form_id == 'commerce_checkout_form_checkout'){
     drupal_add_js($base_path.drupal_get_path('module', 'commerce_todo_pago') .'/includes/jquery.min.js', array("type"=>"file"));
     commerce_todo_pago_block_view();
 
-  } 
+  }
 }
 
+
 function commerce_todo_pago_commerce_payment_method_info() {
-    
+
   $payment_methods = array();
 
   $payment_methods['bank_transfer'] = array(
     'base' => 'commerce_todo_pago',
     'title' => t('Todo Pago'),
     'description' => t('Metodo de Pago Todo Pago'),
-	 'active' => TRUE,
+   'active' => TRUE,
     'terminal' => FALSE,
     'offsite' => TRUE,
   );
@@ -47,59 +51,83 @@ function commerce_todo_pago_commerce_payment_method_info() {
 }
 
 function commerce_todo_pago_push($order,$return) {
-	$ak = $_REQUEST["Answer"];
-	$order_id = $_REQUEST["Order"];
-	push_notification($order_id,$ak); 
+  $ak = $_REQUEST["Answer"];
+  $order_id = $_REQUEST["Order"];
+  push_notification($order_id,$ak);
 }
 
 function commerce_todo_pago_handle_response($order,$return){
-    global $user;   
+  global $user;
 
-    if(isset($_REQUEST["Answer"])){
-      //formulario externo
-      $ak = $_REQUEST["Answer"];
+  if(isset($_REQUEST["Answer"])){
+    //formulario externo
+    $ak = $_REQUEST["Answer"];
+  }else{
+    $url = parse_url($_REQUEST['q']);
+
+    $error = explode("=", $url['query']);
+
+    if($error[0] == "Error"){
+      $order = commerce_order_load($order);
+
+      $payment_method = commerce_payment_method_instance_load('bank_transfer|commerce_payment_bank_transfer');
+      
+      if ($payment_method['settings']["general"]['emptycart_enabled'] == "1"){
+                commerce_cart_order_empty($order);
+                commerce_payment_redirect_pane_previous_page($order);
+                commerce_order_status_update($order, $status);
+
+            } else {
+                commerce_payment_redirect_pane_previous_page($order);
+            }
+
+
+      drupal_set_message(t($error[1]), 'Error');
+      drupal_goto(commerce_checkout_order_uri($order)); 
+
     }else{
-      //formulario hibrido
-      $answer = explode("=", $_REQUEST['q']);
-      $ak = $answer[1];
+        $answer = explode("=", $_REQUEST['q']);
+        $ak = $answer[1];
     }
-    second_step_todopago($order, $return, $user, $ak);
+  }
+
+  second_step_todopago($order, $return, $user, $ak);
 }
 
 function commerce_todo_pago_redirect_form($form, &$form_state, $order, $payment_method) {
-	return first_step_todopago($form, $form_state, $order, $payment_method);
-} 
- 
+  return first_step_todopago($form, $form_state, $order, $payment_method);
+}
+
+
 /**
  * Implements hook_menu().
  */
- 
+
 function commerce_todo_pago_order_status_info() {
 
   $order_statuses = array();
 
   $order_statuses['completed'] = array(
-    'name' => 'completed', 
-    'title' => t('Completed'), 
+    'name' => 'completed',
+    'title' => t('Completed'),
     'state' => 'completed',
   );
 
   return $order_statuses;
-} 
- 
+}
+
 function commerce_todo_pago_menu() {
   $items = array();
- 
   $items['commerce/todopago/notification'] = array(
-      'title' => 'todopago response', 
-      'page callback' => 'commerce_todo_pago_handle_response',   
+      'title' => 'todopago response',
+      'page callback' => 'commerce_todo_pago_handle_response',
       'access arguments' => array('access checkout'),
       'type' => MENU_CALLBACK,
   );
-  
+
   $items['commerce/todopago/push'] = array(
-      'title' => 'todopago push', 
-      'page callback' => 'commerce_todo_pago_push',   
+      'title' => 'todopago push',
+      'page callback' => 'commerce_todo_pago_push',
       'access arguments' => array('access checkout'),
       'type' => MENU_CALLBACK,
   );
@@ -114,7 +142,7 @@ function commerce_todo_pago_menu() {
     'file path' => drupal_get_path('module', 'commerce_todo_pago'),
     'type'  => MENU_NORMAL_ITEM,
   );
-  
+
   $items['admin/commerce/orders/%commerce_order/todo_pago'] = array(
     'title' => 'Todo Pago Status',
     'page callback' => 'drupal_get_form',
@@ -126,7 +154,7 @@ function commerce_todo_pago_menu() {
     'file' => 'includes/commerce_todo_pago.admin.inc',
     'file path' => drupal_get_path('module', 'commerce_todo_pago'),
   );
-  
+
   $items['admin/commerce/orders/%commerce_order/todo_pago_devolucion'] = array(
     'title' => 'Todo Pago - Devolucion',
     'page callback' => 'drupal_get_form',
@@ -147,34 +175,34 @@ function commerce_todo_pago_enable(){
   commerce_todo_pago_add_checkout_fields();
   commerce_todo_pago_add_product_fields();
   commerce_todo_pago_database();
-    
-} 
+
+}
 
 function commerce_todo_pago_database() {
-	$res = db_query("CREATE TABLE IF NOT  EXISTS `{todopago_transaccion}` (
-					   `id` INT NOT NULL AUTO_INCREMENT,
-					   `id_orden` INT NULL,
-					   `first_step` TIMESTAMP NULL,
-					   `params_SAR` TEXT NULL,
-					   `response_SAR` TEXT NULL,
-					   `second_step` TIMESTAMP NULL,
-					   `params_GAA` TEXT NULL,
-					   `response_GAA` TEXT NULL,
-					   `request_key` TEXT NULL,
-					   `public_request_key` TEXT NULL,
-					   `answer_key` TEXT NULL,
-					   PRIMARY KEY (`id`)
-	   );");
+  $res = db_query("CREATE TABLE IF NOT  EXISTS `{todopago_transaccion}` (
+             `id` INT NOT NULL AUTO_INCREMENT,
+             `id_orden` INT NULL,
+             `first_step` TIMESTAMP NULL,
+             `params_SAR` TEXT NULL,
+             `response_SAR` TEXT NULL,
+             `second_step` TIMESTAMP NULL,
+             `params_GAA` TEXT NULL,
+             `response_GAA` TEXT NULL,
+             `request_key` TEXT NULL,
+             `public_request_key` TEXT NULL,
+             `answer_key` TEXT NULL,
+             PRIMARY KEY (`id`)
+     );");
 }
 
 function commerce_todo_pago_add_product_fields(){
-    
+
   commerce_todo_pago_admin_create_instance('csitproductcode', 'list_text', FALSE, 'commerce_product', 'product', t('Tipo de Producto'),NULL,0,array("adult_content"=>"adult_content","coupon"=>"coupon","default"=>"default","electronic_good"=>"electronic_good","electronic_software"=>"electronic_software"  ,"gift_certificate"=>"gift_certificate","handling_only"=>"handling_only","service"=>"service","shipping_and_handling"=>"shipping_and_handling","shipping_only" =>"shipping_only" ,"subscription"=>"subscription"));
   commerce_todo_pago_admin_create_instance('csmdd34', 'list_text', FALSE, 'commerce_product', 'product', t('Tipo de Envio'),NULL,0,array("Pickup"=>"Pickup","Email"=>"Email","Smartphone"=>"Smartphone","Other"=>"Other"));
   commerce_todo_pago_admin_create_instance('csmdd28', 'list_text', FALSE, 'commerce_product', 'product', t('Tipo de Servicio'),NULL,0,array("Luz"=>"Luz","Gas"=>"Gas","Agua"=>"Agua","TV"=>"TV","Cable"=>"Cable","Internet"=>"Internet","Impuestos"=>"Impuestos"));
   commerce_todo_pago_admin_create_instance('csmdd31', 'list_text', FALSE, 'commerce_product', 'product', t('Tipo de delivery'),NULL,0,array("WEB Session"=>"WEB Session","Email"=>"Email","SmartPhone"=>"SmartPhone"));
   commerce_todo_pago_admin_create_instance('csmdd33', 'text', FALSE, 'commerce_product', 'product', t('Dias para el Evento'));
-    
+
 
 
 }
@@ -220,11 +248,11 @@ function commerce_todo_pago_add_checkout_fields() {
     }
 
     field_create_instance($instance);
-    
+
     }
-    
+
     /*********************************************/
-    
+
     $field = field_info_field("todo_pago_ciudad");
   $instance = field_info_instance('commerce_customer_profile', "todo_pago_ciudad", 'billing');
 
@@ -256,9 +284,9 @@ function commerce_todo_pago_add_checkout_fields() {
                             'S' =>   'Santa Fe',
                             'G'  => 'Santiago del Estero',
                             'V'  => 'Tierra del Fuego',
-                            'T'  => 'Tucuman')         
+                            'T'  => 'Tucuman')
           ),
-      
+
       'cardinality' => 1,
       'entity_types' => array('commerce_customer_profile'),
       'translatable' => FALSE,
@@ -291,16 +319,11 @@ function commerce_todo_pago_add_checkout_fields() {
     }
 
     field_create_instance($instance);
-    
-    
-    
-   
-    
-    
+
   }
-  
+
   /*********************************************/
-  
+
     $field = field_info_field("todo_pago_apellido");
   $instance = field_info_instance('commerce_customer_profile', "todo_pago_apellido", 'billing');
 
@@ -331,7 +354,7 @@ function commerce_todo_pago_add_checkout_fields() {
       'display' => array(),
     );
 
-   
+
     foreach (array('default', 'customer', 'administrator') as $view_mode) {
       $instance['display'][$view_mode] = array(
         'label' => 'hidden',
@@ -341,11 +364,11 @@ function commerce_todo_pago_add_checkout_fields() {
     }
 
     field_create_instance($instance);
-    
+
     }
-    
-  
-  
+
+
+
     $field = field_info_field("todo_pago_nombre");
   $instance = field_info_instance('commerce_customer_profile', "todo_pago_nombre", 'billing');
 
@@ -376,7 +399,7 @@ function commerce_todo_pago_add_checkout_fields() {
       'display' => array(),
     );
 
-  
+
     foreach (array('default', 'customer', 'administrator') as $view_mode) {
       $instance['display'][$view_mode] = array(
         'label' => 'hidden',
@@ -386,23 +409,59 @@ function commerce_todo_pago_add_checkout_fields() {
     }
 
     field_create_instance($instance);
-    
+
     }
-    
+
 }
 
-function commerce_todo_pago_views_pre_render(&$view) {
 
-   $view=array();
- }
+function get_todo_pago_transaction($order_id){
+  if(empty($order_id)) return null;
+  $query = db_query("select * from todopago_transaccion where id_orden={$order_id}");
+  $records = $query->fetchAll();
+  if(isset($records[0]))
+    return $records[0];
+  else 
+    return null;
+}
+
+function get_amount_from_tp_transaction($order_id){
+    $amount = "";
+    if(empty($order_id)) {
+    	$tp_transaction = get_todo_pago_transaction($order_id);
+    	$params = json_decode($tp_transaction->params_SAR , true);
+    	$amount = $params[1]['AMOUNT'];
+    }
+    return $amount; 
+}
+
+function get_amount_buyer_from_tp_transaction($order_id){
+    $tp_transaction = get_todo_pago_transaction($order_id);
+    $amount_buyer ='';
+    if(is_object($tp_transaction)){
+      $params = json_decode($tp_transaction->response_GAA , true); 
+      $amount_buyer = $params['Payload']['Request']['AMOUNTBUYER'];  
+    }
+
+    return $amount_buyer; 
+}
+
+function commerce_todo_pago_formatted_components_alter(&$components, &$price, &$entity){
+
+}
+
+
+function commerce_todo_pago_commerce_order_presave($order){
+
+}
 
 
  function commerce_todo_pago_handle_users_view($user,$order){
-    
- 
+
    return true;
-    
+
  }
+
 function commerce_todo_pago_transaction_confirm_access($order, $transaction = NULL, $account = NULL) {
   $access = commerce_payment_transaction_access('update', $transaction, $account);
   if ($access && $transaction) {
@@ -433,9 +492,9 @@ function commerce_todo_pago_settings_form($settings = NULL) {
   $form['#attached']['css'] = array(
     drupal_get_path('module', 'commerce_todo_pago') . '/includes/tp-styles.css',
   );
-  
+
   $form['commerce_todo_pago_help_text'] = array(
-    '#markup' => '<div class="help">' . t('<p><strong>v1.5.1</strong></p><h4><strong>Instrucciones de uso</strong></h4><p>Complete los campos con los valores provistos por Todo Pago</p>') . '</div>', 
+    '#markup' => '<div class="help">' . t('<p><strong>v1.8.0</strong></p><h4><strong>Instrucciones de uso</strong></h4><p>Complete los campos con los valores provistos por Todo Pago</p>') . '</div>', 
   );
 
   $form['general'] = array(
@@ -447,125 +506,218 @@ function commerce_todo_pago_settings_form($settings = NULL) {
   $form['general']['enabled'] = array(
     '#type' => 'select',
     '#title' => t('Account owner'),
-	  '#options' => array(
+    '#options' => array(
           1 => t('Habilitado'),
           0 => t('Deshabilitado'),
        ),
     '#description' => t('Habilitado.'),
-    '#default_value' => isset($settings['general']['enabled']) ? $settings['general']['enabled'] : '0', 
+    '#default_value' => isset($settings['general']['enabled']) ? $settings['general']['enabled'] : '0',
     '#required' => FALSE,
   );
-  
+  /*
   $form['general']['authorization'] = array(
     '#type' => 'textfield',
     '#title' => t('Authorization HTTP'),
-	'#description'=>t('Ingresar el contenido del campo API Keys (Credenciales) del Portal de TodoPago. Ejemplo: "PRISMA 912EC803B2CE49E4A541068D495AB570"'),
+  '#description'=>t('Ingresar el contenido del campo API Keys (Credenciales) del Portal de TodoPago. Ejemplo: "PRISMA 912EC803B2CE49E4A541068D495AB570"'),
     '#default_value' => isset($settings['general']['authorization']) ? $settings['general']['authorization'] : '',
     '#required' => FALSE,
-	'#maxlength'=>500
-  );
-   
-  
+  '#maxlength'=>500
+  ); */
+
+
   $form['general']['segmento'] = array(
     '#type' => 'select',
-	  '#options' => array(
+    '#options' => array(
           'Retail' => t('Retail'),
          'Ticketing' => t('Ticketing'),
          'Services' => t('Services'),
          'Digital_Goods' => t('Digital Goods'),
        ),
     '#title' => t('Segmento del Comercio'),
-	 '#description'=>t('La elecci&oacute;n del segmento determina los tipos de datos a enviar'),
+   '#description'=>t('La elecci&oacute;n del segmento determina los tipos de datos a enviar'),
     '#default_value' => isset($settings['general']['segmento']) ? $settings['general']['segmento'] : 'Retail',
     '#required' => FALSE,
   );
 
   $form['general']['modo'] = array(
     '#type' => 'select',
-	  '#options' => array(
+    '#options' => array(
           'Test' => t('Developers'),
          'Produccion' => t('Produccion'),
       ),
     '#title' => t('Ambiente Developers o Producción'),
-	  '#description'=>t('Debe ser cofigurado en CONFIGURACION - AMBIENTE DEVELOPERS / PRODUCCION'),
+    '#description'=>t('Debe ser cofigurado en CONFIGURACION - AMBIENTE DEVELOPERS / PRODUCCION'),
     '#default_value' => isset($settings['general']['modo']) ? $settings['general']['modo'] : 'Test',
     '#required' => FALSE,
   );
-  
-   $form['general']['deadline'] = array(
+
+  $form['general']['deadline'] = array(
     '#type' => 'textfield',
     '#title' => t('Dead Line'),
-	'#description'=>t('d&iacute;as m&acute;ximos para la entrega'),
+  '#description'=>t('d&iacute;as m&aacute;ximos para la entrega'),
     '#default_value' => isset($settings['general']['deadline']) ? $settings['general']['deadline'] : '',
     '#required' => FALSE,
   );
-  
+
   $form['general']['form'] = array(
     '#type' => 'select',
-	  '#options' => array(
+    '#options' => array(
           '0' => t('Deshabilitado'),
          '1' => t('Habilitado'),
       ),
-    '#title' => t('Formularion on-site'),
-	  '#description'=>t('Seleccione formulario con redirecci&oacute;n u on-site'),
+    '#title' => t('Formulario on-site'),
+    '#description'=>t('Seleccione formulario con redirecci&oacute;n u on-site'),
     '#default_value' => isset($settings['general']['form']) ? $settings['general']['form'] : '0',
     '#required' => FALSE,
   );
-  
-  $form['ambientetest'] = array(
+
+
+  $form['general']['maxinstallments_enabled'] = array(
+    '#type' => 'select',
+    '#options' => array(
+          '0' => t('Deshabilitado'),
+         '1' => t('Habilitado'),
+      ),
+    '#title' => t('Habilitar m&aacute;ximo de cuotas'),
+    '#description'=>t('Habilitar cantidad m&aacute;xima de cuotas'),
+    '#default_value' => isset($settings['general']['maxinstallments_enabled']) ? $settings['general']['maxinstallments_enabled'] : '0',
+    '#required' => FALSE,
+  );
+
+  $form['general']['maxinstallments'] = array(
+    '#type' => 'select',
+    '#options' => array(
+          '1' => 1,
+          '2' => 2,
+          '3' => 3,
+          '4' => 4,
+          '5' => 5,
+          '6' => 6,
+          '7' => 7,
+          '8' => 8,
+          '9' => 9,
+          '10' => 10,
+          '11' => 11,
+          '12' => 12,
+      ),
+    '#title' => t('Fijar cantidad m&aacute;xima de cuotas'),
+    '#description'=>t('fija cantidad m&aacute;xima de cuotas que ofrecer&aacute; el formulario'),
+    '#default_value' => isset($settings['general']['maxinstallments']) ? $settings['general']['maxinstallments'] : '12',
+    '#required' => FALSE,
+  );
+
+  $form['general']['timeout_enabled'] = array(
+    '#type' => 'select',
+    '#options' => array(
+        '0' => t('Deshabilitado'),
+        '1' => t('Habilitado'),
+      ),
+    '#title' => t('Habilitar tiempo de vida del formulario'),
+    '#description'=>t('Tiempo de vida del formulario expresado en milisegundos, si no se especifica, toma el valor de 1800000ms'),
+    '#default_value' => isset($settings['general']['timeout_enabled']) ? $settings['general']['timeout_enabled'] : '0',
+    '#required' => FALSE,
+  );
+
+  $form['general']['timeout'] = array(
+    '#type' => 'textfield',
+    '#attributes' => array(
+        'data-type' => 'number',
+    ),
+    '#title' => t('Tiempo de vida del formulario'),
+    '#description'=>t('Tiempo de duracion del formulario en ms, debe tener valores entre 300000 y 21600000'),
+    '#default_value' => isset($settings['general']['timeout']) ? $settings['general']['timeout'] : '1800000',
+    '#required' => FALSE,
+    '#element_validate' => array('commerce_todo_pago_rangetimeout')
+  );
+
+  $form['general']['emptycart_enabled'] = array(
+    '#type' => 'select',
+    '#options' => array(
+          '0' => t('Deshabilitado'),
+         '1' => t('Habilitado'),
+      ),
+    '#title' => t('Vaciar carrito cuando la compra sea rechazada'),
+    '#description'=>t('Si se habilita esta opción, ante una compra rechazada se vaciará el carrito de compras'),
+    '#default_value' => isset($settings['general']['emptycart_enabled']) ? $settings['general']['emptycart_enabled'] : '0',
+    '#required' => FALSE,
+  );
+
+
+
+
+  $form['test'] = array(
     '#type' => 'fieldset',
     '#title' => t('AMBIENTE DEVELOPERS'),
     '#collapsible' => TRUE,
     '#collapsed' => FALSE,
-  ); 
-
-  $form['ambientetest']['button-credencial']= array(
-    '#markup' => '<button type="button" id="credenciales-dev" class="btn-credencial">'.t('Credentials').'</button>', 
   );
 
-  $form['ambientetest']['idsite'] = array(
+  $form['test']['button-credencial']= array(
+    '#markup' => '<button type="button" id="credenciales-dev" class="btn-credencial">'.t('Credentials').'</button>',
+  );
+
+  $form['test']['idsite'] = array(
     '#type' => 'textfield',
     '#title' => t('Nro. de Comercio - Merchant ID'),
     '#description'=>t('N&uacute;mero de Comercio provisto por Todo Pago'),
-    '#default_value' => isset($settings['ambientetest']['idsite']) ? $settings['ambientetest']['idsite'] : '',
+    '#default_value' => isset($settings['test']['idsite']) ? $settings['test']['idsite'] : '',
     '#required' => FALSE,
   );
-  
-  $form['ambientetest']['security'] = array(
+
+  $form['test']['security'] = array(
     '#type' => 'textfield',
     '#title' => t('Security code'),
-	  '#description'=>t('API Keys sin PRISMA/TODOPAGO y sin espacio'),
-    '#default_value' => isset($settings['ambientetest']['security']) ? $settings['ambientetest']['security'] : '',
+    '#description'=>t('API Keys sin PRISMA/TODOPAGO y sin espacio'),
+    '#default_value' => isset($settings['test']['security']) ? $settings['test']['security'] : '',
     '#required' => FALSE,
   );
-  
-  $form['ambienteproduccion'] = array(
+
+  $form['test']['authorization'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Authorization HTTP'),
+  '#description'=>t('Ingresar el contenido del campo API Keys (Credenciales) del Portal de TodoPago. Ejemplo: "PRISMA 912EC803B2CE49E4A541068D495AB570"'),
+    '#default_value' => isset($settings['test']['authorization']) ? $settings['test']['authorization'] : '',
+    '#required' => FALSE,
+  '#maxlength'=>500
+  );
+
+
+  $form['prod'] = array(
     '#type' => 'fieldset',
     '#title' => t('AMBIENTE PRODUCCION'),
     '#collapsible' => TRUE,
     '#collapsed' => FALSE,
   );
 
-  $form['ambienteproduccion']['button-credencial']= array(
-    '#markup' => '<button type="button" id="credenciales-prod" class="btn-credencial">'.t('Credentials').'</button>', 
+  $form['prod']['button-credencial']= array(
+    '#markup' => '<button type="button" id="credenciales-prod" class="btn-credencial">'.t('Credentials').'</button>',
   );
 
-  $form['ambienteproduccion']['idsite'] = array(
+  $form['prod']['idsite'] = array(
     '#type' => 'textfield',
     '#title' => t('Nro. de Comercio - Merchant ID'),
-	'#description'=>t('N&uacute;mero de Comercio provisto por Todo Pago'),
-    '#default_value' => isset($settings['ambienteproduccion']['idsite']) ? $settings['ambienteproduccion']['idsite'] : '',
+  '#description'=>t('N&uacute;mero de Comercio provisto por Todo Pago'),
+    '#default_value' => isset($settings['prod']['idsite']) ? $settings['prod']['idsite'] : '',
     '#required' => FALSE,
   );
-  
-  $form['ambienteproduccion']['security'] = array(
+
+  $form['prod']['security'] = array(
     '#type' => 'textfield',
     '#title' => t('Security code'),
-	  '#description'=>t('API Keys sin PRISMA/TODOPAGO y sin espacio'),
-    '#default_value' => isset($settings['ambienteproduccion']['security']) ? $settings['ambienteproduccion']['security'] : '',
+    '#description'=>t('API Keys sin PRISMA/TODOPAGO y sin espacio'),
+    '#default_value' => isset($settings['prod']['security']) ? $settings['prod']['security'] : '',
     '#required' => FALSE,
   );
-  
+
+   $form['prod']['authorization'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Authorization HTTP'),
+  '#description'=>t('Ingresar el contenido del campo API Keys (Credenciales) del Portal de TodoPago. Ejemplo: "PRISMA 912EC803B2CE49E4A541068D495AB570"'),
+    '#default_value' => isset($settings['prod']['authorization']) ? $settings['prod']['authorization'] : '',
+    '#required' => FALSE,
+  '#maxlength'=>500
+  );
+
   $form['login-credential'] = array(
     '#type' => 'fieldset',
     '#title' => t('OBTENER CREDENCIALES'),
@@ -578,7 +730,7 @@ function commerce_todo_pago_settings_form($settings = NULL) {
     '#title' => t('Usuario de Todo Pago'),
     '#required' => FALSE,
   );
-  
+
   $form['login-credential']['tp-password'] = array(
     '#type' => 'password',
     '#title' => t('Contrase&ntilde;a de Todo Pago'),
@@ -586,31 +738,31 @@ function commerce_todo_pago_settings_form($settings = NULL) {
   );
 
   $form['login-credential']['message']= array(
-    '#markup' => '<div class="loader" style="display:none;"><img class="loader-image" src="'.drupal_get_path("module", "commerce_todo_pago").'/includes/images/loader.gif" alt="loading.."></div><div id="error_message"></div>', 
+    '#markup' => '<div class="loader" style="display:none;"><img class="loader-image" src="'.drupal_get_path("module", "commerce_todo_pago").'/includes/images/loader.gif" alt="loading.."></div><div id="error_message"></div>',
   );
 
   $form['login-credential']['button-credencial']= array(
-    '#markup' => '<button type="button" id="login-credencial" class="btn-credencial">'.t('Credentials').'</button>', 
+    '#markup' => '<button type="button" id="login-credencial" class="btn-credencial">'.t('Credentials').'</button>',
   );
 
-	$order_statuses = module_invoke_all('commerce_order_status_info');
-	
+  $order_statuses = module_invoke_all('commerce_order_status_info');
+
   $form['status'] = array(
     '#type' => 'fieldset',
     '#title' => t('ESTADOS DEL PEDIDO'),
     '#collapsible' => TRUE,
     '#collapsed' => FALSE,
   );
-  
+
    foreach (commerce_order_state_get_title() as $name => $title) {
     foreach (commerce_order_statuses(array('state' => $name)) as $order_status) {
       $options[check_plain($title)][$order_status['name']] = check_plain($order_status['title']);
     }
   }
-  
+
   $form['status']['start'] = array(
     '#type' => 'select',
-	'#options' => $options,
+  '#options' => $options,
     '#title' => t('Estado cuando la transaccion ha sido iniciada'),
     '#default_value' => isset($settings['status']['start']) ? $settings['status']['start'] : '',
     '#required' => FALSE,
@@ -618,31 +770,31 @@ function commerce_todo_pago_settings_form($settings = NULL) {
 
   $form['status']['aprobada'] = array(
     '#type' => 'select',
-	 '#options' => $options,
+   '#options' => $options,
     '#title' => t('Estado cuando la transaccion ha sido aprobada'),
 
     '#default_value' => isset($settings['status']['aprobada']) ? $settings['status']['aprobada'] : '',
     '#required' => FALSE,
   );
-  
+
   $form['status']['rechazada'] = array(
     '#type' => 'select',
-	'#options' => $options,
+  '#options' => $options,
     '#title' => t('Estado cuando la transaccion ha sido Rechazada'),
 
     '#default_value' => isset($settings['status']['rechazada']) ? $settings['status']['rechazada'] : '',
     '#required' => FALSE,
   );
-  
+
   $form['status']['offline'] = array(
     '#type' => 'select',
-	'#options' => $options,
+  '#options' => $options,
     '#title' => t('Estado cuando la transaccion ha sido Offline'),
 
     '#default_value' => isset($settings['status']['offline']) ? $settings['status']['offline'] : '',
     '#required' => FALSE,
   );
-  
+
   return $form;
 }
 
@@ -650,10 +802,10 @@ function commerce_todo_pago_settings_form($settings = NULL) {
  * Payment method callback: checkout form.
  */
 function commerce_todo_pago_submit_form($payment_method, $pane_values, $checkout_pane, $order) {
-	
+
   $form = array();
 
-  
+
   if (!empty($order->data['bank_transfer'])) {
     $pane_values += $order->data['bank_transfer'];
   }
@@ -666,12 +818,23 @@ function commerce_todo_pago_submit_form($payment_method, $pane_values, $checkout
   return $form;
 }
 
+function commerce_todo_pago_rangetimeout($element, &$form_state) {
+  if (!empty($element['#value']) && ($element['#value'] > 6*60*60*1000 || $element['#value'] < 5*60*1000)) {
+    form_error($element, t('El valor del campo timeout es incorrecto'));
+  }
+} 
+
+function commerce_todo_pago_commerce_checkout_page_info_alter(&$checkout_pages) {
+	$checkout_pages['payment']['status_cart'] = true;
+	$checkout_pages['complete']['status_cart'] = true;
+	$checkout_pages['review']['status_cart'] = true;
+}
 
 function commerce_todo_pago_admin_create_instance($field_name, $field_type, $required, $entity_type, $bundle, $label, $description = NULL, $weight = 0,$allow=array()) {
 
   $field = field_info_field($field_name);
   $instance = field_info_instance($entity_type, $field_name, $bundle);
-	
+
   if (empty($field)) {
     $field = array(
       'field_name' => $field_name,
@@ -690,7 +853,7 @@ function commerce_todo_pago_admin_create_instance($field_name, $field_type, $req
     if ($field_type == 'list_text') {
       $field['settings'] = array(
         'allowed_values' => $allow,
-    
+
       );
     }
     $field = field_create_field($field);
@@ -715,13 +878,11 @@ function commerce_todo_pago_admin_create_instance($field_name, $field_type, $req
 
     $entity_info = entity_get_info($entity_type);
 
-  
+
     $entity_info['view modes']['default'] = array();
 
     field_create_instance($instance);
   }else{
-	
+
   }
 }
-
-
