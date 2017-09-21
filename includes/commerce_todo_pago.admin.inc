@@ -61,7 +61,10 @@ TPLog("", "", $settings["general"]["modo"])->info("response DEVOLUCION ".json_en
 	$tabla .= "<tr><td>Orden</td><td>".$order->order_number."</td></tr>";
 	$tabla .= "<tr><td>Estado</td><td>".$order->status."</td></tr>";
 	$tabla .= "<tr><td>Valor</td><td>$".number_format(commerce_currency_amount_to_decimal($order->commerce_order_total[LANGUAGE_NONE][0]["amount"],$order->commerce_order_total[LANGUAGE_NONE][0]["currency_code"]),2,".","") ."</td></tr>";
-	$tabla .= '<tr><td>A devolver</td><td><input type="text" class="form-text" name="amount" value="'.number_format(commerce_currency_amount_to_decimal($order->commerce_order_total[LANGUAGE_NONE][0]["amount"],$order->commerce_order_total[LANGUAGE_NONE][0]["currency_code"]),2,".","") .'"></input></td></tr>';
+	$tabla .= '<tr>
+				<td>A devolver</td>
+				<td><input type="text" class="form-text" name="amount" value="0.00"></input></td>
+			   </tr>';
 	$tabla .= "</table>";
 	$tabla .= '<input id="devolucion-submit" name="devolucion" value="Devolucion online" class="form-submit" type="submit">';
 	
@@ -133,31 +136,31 @@ function commerce_todo_pago_admin_form($form, &$form_state,$order = false) {
 		    
 		      foreach ($status['Operations'] as $key => $value) {   
 		          if(is_array($value) && $key == $auxColection){
-		              $rta .= "<tr><td>$key: </td>\n";
+		              $rta .= "<tr><td>$key: </td></br>";
 		              foreach ($auxArray[$aux] as $key2 => $value2) {  
 		                  $rta .= '<td>';           
-		                  $rta .= $aux." \n";                
+		                  $rta .= $aux." </br>";                
 		                  if(is_array($value2)){                    
-		                      foreach ($value2 as $key3 => $value3) {
+		                      foreach ($value2 as $key3 => $value3) { 	
 		                          if(is_array($value3)){ 
 		                              foreach ($value3 as $key4 => $value4) {
-		                                  $rta .= "   - $key4: $value4 \n";
+		                                  $rta .= "   - $key4: $value4 </br>";
 		                              }
 		                          }else{
-		                              $rta .= "   - $key3: $value3 \n"; 
+		                              $rta .= "   - $key3: $value3 </br>"; 
 		                          }                   
 		                      }
 		                  }else{
-		                    $rta .= "   - $key2: $value2 \n";
+		                    $rta .= "   - $key2: $value2 </br>";
 		                  }
-		                  $rta .= '<td>';
+		                  $rta .= '</td>';
 		              }
 		              $rta .= "</tr>";                                
 		          }else{
 		              if(is_array($value)){
 		                  $rta .= "<tr><td>$key:</td><td>";
 		                  foreach ($value as $key5 => $value5) {
-		                      $rta .= "   - $key5: $value5 \n";
+		                      $rta .= "   - $key5: $value5 </br>";
 		                  }
 		                  $rta .= "</td></tr>";
 		              }else{
@@ -166,7 +169,7 @@ function commerce_todo_pago_admin_form($form, &$form_state,$order = false) {
 		          }
 		      }
 		}else{
-		    $rta .= '<tr><td>No hay operaciones para esta orden.<td></tr>';
+		    $rta .= '<tr><td>No hay operaciones para esta orden.</td></tr>';
 		}
 	   
 		$form['confirmation'] = array(

@@ -4,6 +4,8 @@ use TodoPago\Sdk;
 include_once(drupal_get_path('module', 'commerce_todo_pago').'/includes/ControlFraude/ControlFraudeFactory.php');
 include_once(drupal_get_path('module', 'commerce_todo_pago').'/includes/Logger/logger.php');
 
+include_once(drupal_get_path('module', 'commerce_todo_pago').'/vendor/autoload.php');
+
 function TPLog($order = null, $user = null, $endpoint = null) {
 
 	$logger = new TodoPagoLogger();
@@ -38,7 +40,7 @@ function _phoneSanitize($number){
 }
 
 function _tranEstado($oid)
-{
+{	
 	$res = db_query("SELECT * FROM {todopago_transaccion} WHERE id_orden=".$oid);
 	$res = $res->fetchAssoc();
 	if(!$res) {
@@ -159,8 +161,39 @@ function call_SAR($connector, $order, $optionsSAR_comercio, $optionsSAR_operacio
 {
 	global $user;
 	TPLog($order->order_id, $user->uid, $payment_method["settings"]["general"]["modo"])->info("params SAR ".json_encode(array($optionsSAR_comercio, $optionsSAR_operacion)));
-	$rta = $connector->sendAuthorizeRequest($optionsSAR_comercio, $optionsSAR_operacion);
+	
+/*	// si esta habilitado para la direcciones de gmaps setear cliente google
+    $address_result = address_loaded($optionsSAR_operacion);
 
+    $gClient = null;
+
+    if($address_result['address_loaded']){
+        $optionsSAR_operacion = $address_result['payDataOperacion'];
+        update_addresses($order, $address_result);
+       
+    }elseif ($payment_method['settings']["general"]['gmaps_enabled'] == 1){
+        $gClient = new \TodoPago\Client\Google();
+
+        if($gClient != null) {
+            $connector->setGoogleClient($gClient);
+        }
+       
+    }
+*/
+	$rta = $connector->sendAuthorizeRequest($optionsSAR_comercio, $optionsSAR_operacion);
+	//guardo direccion 
+/*    if($gClient != null) {
+        tp_save_address($connector->getGoogleClient()->getFinalAddress());
+        // modify addresses
+        $old_address = $connector->getGoogleClient()->getOriginalAddress(); 
+
+        $payDataOperacion['payDataOperacion'] = $connector->getGoogleClient()->getFinalAddress();
+        $payDataOperacion['old_CSBT_address'] = $old_address['billing'];
+        $payDataOperacion['old_CSST_address'] = $old_address['shipping'];
+        
+        update_addresses($order, $payDataOperacion);
+    }
+*/
 	TPLog($order->order_id, $user->uid, $payment_method["settings"]["general"]["modo"])->info("response SAR ".json_encode($rta));
 
 	$settings = $payment_method["settings"];
@@ -202,6 +235,154 @@ function call_SAR($connector, $order, $optionsSAR_comercio, $optionsSAR_operacio
 	}
 	return $form;
 }
+
+
+function address_loaded($payDataOperacion){
+   
+    $CSBT_address = get_loaded_address($payDataOperacion, 'CSBT');   
+    $CSST_address = get_loaded_address($payDataOperacion, 'CSST');
+   
+    if (($CSBT_address['result'] != null) && ( $CSST_address['result'] != null ) ){
+        $payDataOperacion['CSBTSTREET1']= $CSBT_address['result']['address'];
+        $payDataOperacion['CSBTPOSTALCODE']= $CSBT_address['result']['postal_code'];
+        $payDataOperacion['CSBTCITY']= $CSBT_address['result']['city'];
+        $payDataOperacion['CSBTCOUNTRY']= $CSBT_address['result']['country'];
+
+        $payDataOperacion['CSSTSTREET1']= $CSST_address['result']['address'];
+        $payDataOperacion['CSSTPOSTALCODE']= $CSST_address['result']['postal_code'];
+        $payDataOperacion['CSSTCITY']= $CSST_address['result']['city'];
+        $payDataOperacion['CSSTCOUNTRY']= $CSST_address['result']['country'];
+
+        $address_loaded = true;
+    }else{
+        $address_loaded = false;
+    }
+
+    $address_result = array('payDataOperacion' => $payDataOperacion,                            
+                            'address_loaded' => $address_loaded,
+                            'old_CSBT_address' => $CSBT_address['old_address'],
+                            'old_CSST_address' => $CSST_address['old_address']
+                            );
+
+    return $address_result; 
+}
+
+
+/**
+*   returns stdClass if exist address, else returns null
+*/
+function get_loaded_address($payDataOperacion, $type){
+	
+    $street  = explode(' ', $payDataOperacion["{$type}STREET1"]);
+
+    $where = '';  
+    foreach ($street as $val) { 
+        $where .= " address like '%{$val}%' and ";
+    }
+
+    $query = "SELECT * FROM `{todopago_address}` where {$where} postal_code like '%{$payDataOperacion["{$type}POSTALCODE"]}%' and country='{$payDataOperacion["{$type}COUNTRY"]}' limit 1" ;
+ 
+    $res = db_query($query);
+	$result['result'] = $res->fetchAssoc(); 
+
+	$result['old_address'] = array (
+      "{$type}STREET1" => $payDataOperacion["{$type}STREET1"],
+      "{$type}CITY" => $payDataOperacion["{$type}CITY"],
+      "{$type}STATE" => $payDataOperacion["{$type}STATE"],
+      "{$type}COUNTRY" => $payDataOperacion["{$type}COUNTRY"]
+	);
+
+    return $result;
+}
+
+function update_addresses($order,  $payDataOperacion){
+
+    $street  = explode(' ', $payDataOperacion['old_CSBT_address']['CSBTSTREET1']);
+    $data = array("commerce_customer_address_thoroughfare" => $payDataOperacion['payDataOperacion']['billing']['CSBTSTREET1'],
+    			"commerce_customer_address_locality" => $payDataOperacion['payDataOperacion']['billing']['CSBTCITY'],
+    			"commerce_customer_address_postal_code" => $payDataOperacion['payDataOperacion']['billing']['CSBTPOSTALCODE']
+    			);
+
+    $query = db_update("field_data_commerce_customer_address");
+	$query->fields($data)
+			->condition('entity_type', 'commerce_customer_profile', '=')
+			->condition('deleted', 0, '=')
+			->condition('bundle', 'billing', '=')
+			->condition('commerce_customer_address_country', $payDataOperacion['old_CSBT_address']['CSBTCOUNTRY'], '=')
+			->condition('commerce_customer_address_locality', $payDataOperacion['old_CSBT_address']['CSBTCITY'], '=')
+			->condition('commerce_customer_address_administrative_area', $payDataOperacion['old_CSBT_address']['CSBTSTATE'], '=');
+
+			foreach ( $street as $val ){
+				$query->condition('commerce_customer_address_thoroughfare', "%{$val}%", 'like');	
+			}
+
+	$query->execute();
+
+
+	$street  = explode(' ', $payDataOperacion['old_CSST_address']['CSSTSTREET1']);
+    $data = array("commerce_customer_address_thoroughfare" => $payDataOperacion['payDataOperacion']['shipping']['CSSTSTREET1'],
+    			"commerce_customer_address_locality" => $payDataOperacion['payDataOperacion']['shipping']['CSSTCITY'],
+    			"commerce_customer_address_postal_code" => $payDataOperacion['payDataOperacion']['shipping']['CSSTPOSTALCODE']
+    			);
+
+    $query = db_update("field_data_commerce_customer_address");
+	$query->fields($data)
+			->condition('entity_type', 'commerce_customer_profile', '=')
+			->condition('deleted', 0, '=')
+			->condition('bundle', 'shipping', '=')
+			->condition('commerce_customer_address_country', $payDataOperacion['old_CSST_address']['CSSTCOUNTRY'], '=')
+			->condition('commerce_customer_address_locality', $payDataOperacion['old_CSST_address']['CSSTCITY'], '=')
+			->condition('commerce_customer_address_administrative_area', $payDataOperacion['old_CSST_address']['CSSTSTATE'], '=');
+
+			foreach ( $street as $val ){
+				$query->condition('commerce_customer_address_thoroughfare', "%{$val}%", 'like');	
+			}
+
+	$query->execute();
+
+    return false;
+}
+
+function tp_save_address($payDataOperacion){
+
+    // Get a db connection.
+    $data = array("address" => $payDataOperacion['billing']['CSBTSTREET1'],
+     "city" => $payDataOperacion['billing']['CSBTCITY'], 
+     "postal_code" => $payDataOperacion['billing']['CSBTPOSTALCODE'], 
+     "country" => $payDataOperacion['billing']['CSBTCOUNTRY']);
+
+	$query = db_insert("todopago_address");
+	$query->fields($data)->execute();
+
+
+    if (address_diff($payDataOperacion)){
+
+        $data = array("address" => $payDataOperacion['shipping']['CSSTSTREET1'],
+         "city" => $payDataOperacion['shipping']['CSSTCITY'], 
+         "postal_code" => $payDataOperacion['shipping']['CSSTPOSTALCODE'], 
+         "country" => $payDataOperacion['shipping']['CSSTCOUNTRY']);
+
+		$query = db_insert("todopago_address");
+		$query->fields($data)->execute();
+
+    } 
+    
+}
+
+
+function address_diff($payDataOperacion){
+        $result = false; 
+
+        if($payDataOperacion['billing']['CSBTCOUNTRY'] != $payDataOperacion['shipping']['CSSTCOUNTRY']) $result = true; 
+        if($payDataOperacion['billing']['CSBTPOSTALCODE'] != $payDataOperacion['shipping']['CSSTPOSTALCODE']) $result = true; 
+        if($payDataOperacion['billing']['CSBTCITY'] != $payDataOperacion['shipping']['CSSTCITY']) $result = true; 
+        if($payDataOperacion['billing']['CSBTSTREET1'] != $payDataOperacion['shipping']['CSSTSTREET1']) $result = true; 
+
+        return $result;
+}
+
+
+
 
 function first_step_todopago($form, &$form_state, $order, $payment_method)
 {
@@ -286,7 +467,7 @@ function take_action($order, $rta2)
 		    $line_item_wrapper->commerce_unit_price->value(),
 		    'base_price',
 		    array(
-	        	    'amount' => $rta2["Payload"]["Request"]["AMOUNTBUYER"]*100 - $rta2["Payload"]["Request"]["AMOUNT"]*100,
+	        	    'amount' => $rta2["Payload"]["Request"]["AMOUNTBUYER"]*100,
 		            'currency_code' => $default_currency_code,
 		            'data' => array(),
 		    ),

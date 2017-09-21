@@ -175,6 +175,7 @@ function commerce_todo_pago_enable(){
   commerce_todo_pago_add_checkout_fields();
   commerce_todo_pago_add_product_fields();
   commerce_todo_pago_database();
+  commerce_todo_pago_address_table();
 
 }
 
@@ -194,6 +195,18 @@ function commerce_todo_pago_database() {
              PRIMARY KEY (`id`)
      );");
 }
+
+function commerce_todo_pago_address_table() {
+  $res = db_query("CREATE TABLE IF NOT  EXISTS `{todopago_address}` (
+            `id` INT(11) UNSIGNED NOT NULL AUTO_INCREMENT,
+            `address` VARCHAR(255) NULL DEFAULT NULL,
+            `city` VARCHAR(255) NULL DEFAULT NULL,
+            `postal_code` VARCHAR(255) NULL DEFAULT NULL,
+            `country` VARCHAR(255) NULL DEFAULT NULL,
+            PRIMARY KEY (`id`)
+     );");
+}
+
 
 function commerce_todo_pago_add_product_fields(){
 
@@ -643,6 +656,17 @@ function commerce_todo_pago_settings_form($settings = NULL) {
   );
 
 
+  $form['general']['gmaps_enabled'] = array(
+    '#type' => 'select',
+    '#options' => array(
+          '0' => t('Deshabilitado'),
+         '1' => t('Habilitado'),
+      ),
+    '#title' => t('Formatear direcciones con google maps'),
+    '#description'=>t(''),
+    '#default_value' => isset($settings['general']['gmaps_enabled']) ? $settings['general']['gmaps_enabled'] : '0',
+    '#required' => FALSE,
+  );
 
 
   $form['test'] = array(

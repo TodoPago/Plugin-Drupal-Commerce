@@ -1,11 +1,12 @@
-<html>
+
 <head>
 	<?php if($_GET["modo"] == "test"){ ?>
-		<script src='https://developers.todopago.com.ar/resources/TPHybridForm-v0.1.js'></script>
+		<script src='https://developers.todopago.com.ar/resources/v2/TPBSAForm.min.js'></script>
 	<?php }else{ ?>
-		<script src='https://forms.todopago.com.ar/resources/TPHybridForm-v0.1.js'></script>
+		<script src='https://forms.todopago.com.ar/resources/v2/TPBSAForm.min.js'></script>
 	<?php } ?>
 	<script src="https://ajax.googleapis.com/ajax/libs/jquery/2.2.0/jquery.min.js"></script>
+	<link rel="stylesheet" type="text/css" href="tp-styles.css">
 	<style>
 		.field{
 			margin:7px 0 2px 0;
@@ -21,87 +22,98 @@
 			<div id="tp-logo"></div>
 			<div id="tp-content-form fieldset"><br/>
 				<div class="field">
-					<label for="formaDePagoCbx" class="tp-label required"><em>*</em>Medio de Pago</label>
-					<div class="input-box">
-						<select id="formaDePagoCbx"></select><span class="error" id="formaDePagoCbxError"></span>
-					</div>
+				<select id="formaPagoCbx"></select>
+					<label for="medioPagoCbx" class="tp-label required"></label><br />
 				</div>
 				<div class="field">
-					<label for="bancoCbx" class="tp-label required spacer"><em>*</em>Banco Emisor</label>
+					<label id="numeroTarjetaLbl" for="numeroTarjetaTxt" class="tp-label required spacer"></label>
+					<div class="input-box">
+						<input class="input-text required-entry" id="numeroTarjetaTxt" maxlength="16" title="Número de Tarjeta"/>
+						<span class="error" id="numeroTarjetaTxtError"></span>
+					</div>
+				</div>	
+				<div class="field">
+					<div class="input-box">
+						<select id="medioPagoCbx"></select><span class="error" id="formaDePagoCbxError"></span>
+					</div>
+
+				</div>						
+				<div class="field">
 					<div class="input-box">
 						<select id="bancoCbx"></select><span class="error" id="bancoCbxError"></span>
 					</div>
 				</div>
 				<div class="field">
-					<label for="promosCbx" class="tp-label required spacer"><em>*</em>Cantidad de cuotas</label>
+					
 					<div class="input-box">
 						<select id="promosCbx" class="left"></select><span class="error" id="promosCbxError"></span>
+						<label id="promosLbl" for="promosCbx" class="tp-label required spacer"></label>
 						<label id="labelPromotionTextId" class="left tp-label"></label>
 						<div class="clear"></div>
 					</div>
 				</div>
 				<!-- Para los casos en el que el comercio opera con PEI -->
-				<div class="form-row tp-no-cupon">
-					<label id="labelPeiCheckboxId"></label>
+				<div>
+			    	<label id="peiLbl"></label>
+			    	<label id="tokenPeiLbl"></label>
+					<input id="tokenPeiTxt"/>
 					<input id="peiCbx"/>
 				</div>
 
-				<div class="field">
-					<label for="numeroTarjetaTxt" class="tp-label required spacer"><em>*</em>Número de Tarjeta</label>
-					<div class="input-box">
-						<input class="input-text required-entry" id="numeroTarjetaTxt" maxlength="16" title="Número de Tarjeta"/>
-						<span class="error" id="numeroTarjetaTxtError"></span>
-					</div>
+
+				<div class="form-row tp-no-cupon">
+					<label id="labelPeiCheckboxId"></label>
 				</div>
-				<div class="field">
-					<label for="mesTxt" class="tp-label required spacer"><em>*</em>Fecha de Vencimiento</label>
-					<div class="dateFields">
-						<div class="input-box">
-							<input id="mesTxt" maxlength="2" class="left input-text required-entry small">
-							<span class="left spacer">/</span>
-							<input id="anioTxt" maxlength="2" class="left input-text required-entry small">
-						</div>
-						<div class="clear"></div><span class="error" id="anioTxtError"></span>
-					</div>
-				</div>
-				<div class="field">
-					<label for="codigoSeguridadTxt" id="labelCodSegTextId" class="tp-label required spacer"><em>*</em>Código de Seguridad</label>
+
+
+				<div class="field">				
 					<div class="input-box">
-						<input id="codigoSeguridadTxt" class="left input-text required-entry small"/>
+						<input id="codigoSeguridadTxt" class="left input-text required-entry small"/></br>
+						<label for="codigoSeguridadTxt" id="codigoSeguridadLbl" class="tp-label required spacer"></label></br>
 						<span class="error" id="codigoSeguridadTxtError"></span>
 						<div class="clear"></div>
 					</div>
 				</div>
 				<div class="field">
-					<label for="apynTxt" class="tp-label required"><em>*</em>Nombre y Apellido</label>
-					<div class="input-box">
-						<input id="apynTxt"/>
-						<span class="error" id="apynTxtError"></span>
-					</div>
-				</div>
-				<div class="field">
-					<label for="tipoDocCbx" class="tp-label required spacer"><em>*</em>Documento</label>
+					<label for="tipoDocCbx" class="tp-label required spacer"></label>
 					<div>
 						<div class="input-box">
 							<select id="tipoDocCbx" class="left"></select>
 							<span class="left spacer">&nbsp;</span>
 							<input id="nroDocTxt" class="left input-text required-entry" />
-						</div>
+						</div></br>
 						<div class="clear"></div>
 						<span class="error" id="nroDocTxtError"></span>
 					</div>
 				</div>
+
+
 				<div class="field">
-					<label for="emailTxt" class="tp-label required"><em>*</em>Email</label>
+					<div class="input-box">
+						<select id="mesCbx"></select>
+						<select id="anioCbx"></select>
+						</br>
+						<label id="fechaLbl" class="error"></label>
+					</div>
+				</div>
+
+
+				<div class="field">
+					<div class="input-box">
+						<input id="nombreTxt"/><br/>
+						<span class="error" id="nombreTxtError"></span>
+					</div>
+				</div>
+
+				<div class="field">
+					<label for="emailTxt" class="tp-label required"></label>
 					<div class="input-box">
 						<input id="emailTxt"/><br/>
 						<span class="error" id="emailTxtError"></span>
 					</div>
 				</div>
-				<div><!-- Para los casos en el que el comercio opera con PEI -->
-			    	<label id="labelPeiTokenTextId"></label>
-					<input id="peiTokenTxt"/>
-				</div>
+				
+
 				<div id="tp-bt-wrapper">
 					<button id="MY_btnConfirmarPago" title="Pagar" class="button"><span>Pagar</span></button>
 					<button id='MY_btnPagarConBilletera' title="Pagar con billetera virtual" class='button'><span>Pagar con billetera virtual</span></button>
@@ -138,16 +150,19 @@
 			codigoSeguridadTxt: 'Codigo',
 		});
 
+
+
 		window.TPFORMAPI.hybridForm.setItem({
 			publicKey: security,
             defaultNombreApellido: completeName,
             defaultNumeroDoc: dni,
             defaultMail: mail,
             defaultTipoDoc: defDniType
-		});
+		});		
 		//callbacks de respuesta del pago
 		function validationCollector(response) {
 			$("#"+response.field).addClass("error");
+			console.log(response.error);
 			$("#"+response.field+"Error").html("<span class='error'>"+response.error+"</span>");
 		}
 
@@ -178,4 +193,4 @@
 		}
 
 	</script>
-</body></html>
+</body>

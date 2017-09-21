@@ -10,3 +10,8 @@
     padding: 6px 30px;
     text-decoration: none;
 }
+
+.error{
+    color:red !important;
+    font-size:0.9em !important;
+}
