@@ -5,13 +5,13 @@ include_once(drupal_get_path('module', 'commerce_todo_pago').'/includes/ControlF
 include_once(drupal_get_path('module', 'commerce_todo_pago').'/includes/Logger/logger.php');
 
 include_once(drupal_get_path('module', 'commerce_todo_pago').'/vendor/autoload.php');
-
+define('TP_PLUGIN_VERSION',"1.8.0");
 function TPLog($order = null, $user = null, $endpoint = null) {
 
 	$logger = new TodoPagoLogger();
 	$logger->setPhpVersion(phpversion());
 	$logger->setCommerceVersion(VERSION);
-	$logger->setPluginVersion("1.9.0");
+	$logger->setPluginVersion(TP_PLUGIN_VERSION);
 	$payment = false;
 	if($order != null)
 		$payment = true;
@@ -126,6 +126,9 @@ function get_paydata($order, $user, $form, $payment_method)
          $modo = "test";
     }
 
+
+    $typeForm = ($settings['general']['form'])?'H':'E';
+ 
 	$optionsSAR_comercio = array (
 		'Security'=>$settings[$modo]["security"],
 		'EncodingMethod'=>'XML',
@@ -138,6 +141,10 @@ function get_paydata($order, $user, $form, $payment_method)
 	$optionsSAR_operacion["OPERATIONID"] =$order->order_id;
 	$optionsSAR_operacion["CURRENCYCODE"]	=032;
 	$optionsSAR_operacion["AMOUNT"]	=$monto;
+	$optionsSAR_operacion['ECOMMERCENAME'] = 'DRUPAL';
+	$optionsSAR_operacion['ECOMMERCEVERSION'] = get_cmsversion();
+	$optionsSAR_operacion['CMSVERSION'] = VERSION;
+	$optionsSAR_operacion['PLUGINVERSION'] = TP_PLUGIN_VERSION.'-'. $typeForm;
 
 	if( isset($payment_method["settings"]["general"]["maxinstallments_enabled"]) 
 		&& $payment_method["settings"]["general"]["maxinstallments_enabled"] == 1  )
@@ -156,6 +163,29 @@ function get_paydata($order, $user, $form, $payment_method)
 
 	return array($connector, $optionsSAR_comercio, $optionsSAR_operacion);
 }
+
+
+function get_cmsversion(){
+	
+	if(empty(system_get_info("module", "Commerce"))) {
+
+		$sys_vars = system_get_info("module", "commerce_kickstart");
+		$CMS_version = explode('-',$sys_vars['version']);
+		$cms_version = "{$CMS_version[1]}";
+
+	}else{
+		
+		$cms_version = system_get_info("module", "Commerce");
+		$cms_version = "{$cms_version[0]}";
+	
+	}
+	
+	return $cms_version;
+
+}
+
+
+
 
 function call_SAR($connector, $order, $optionsSAR_comercio, $optionsSAR_operacion, $payment_method, $form, $form_state)
 {

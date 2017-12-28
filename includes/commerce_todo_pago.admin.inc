@@ -133,41 +133,7 @@ function commerce_todo_pago_admin_form($form, &$form_state,$order = false) {
 		}
 
 		if (isset($status['Operations']) && is_array($status['Operations']) ) {
-		    
-		      foreach ($status['Operations'] as $key => $value) {   
-		          if(is_array($value) && $key == $auxColection){
-		              $rta .= "<tr><td>$key: </td></br>";
-		              foreach ($auxArray[$aux] as $key2 => $value2) {  
-		                  $rta .= '<td>';           
-		                  $rta .= $aux." </br>";                
-		                  if(is_array($value2)){                    
-		                      foreach ($value2 as $key3 => $value3) { 	
-		                          if(is_array($value3)){ 
-		                              foreach ($value3 as $key4 => $value4) {
-		                                  $rta .= "   - $key4: $value4 </br>";
-		                              }
-		                          }else{
-		                              $rta .= "   - $key3: $value3 </br>"; 
-		                          }                   
-		                      }
-		                  }else{
-		                    $rta .= "   - $key2: $value2 </br>";
-		                  }
-		                  $rta .= '</td>';
-		              }
-		              $rta .= "</tr>";                                
-		          }else{
-		              if(is_array($value)){
-		                  $rta .= "<tr><td>$key:</td><td>";
-		                  foreach ($value as $key5 => $value5) {
-		                      $rta .= "   - $key5: $value5 </br>";
-		                  }
-		                  $rta .= "</td></tr>";
-		              }else{
-		                  $rta .= "<tr><td>$key:</td><td>$value</td></tr>";
-		              }
-		          }
-		      }
+		    $rta .= printGetStatus($status['Operations']);
 		}else{
 		    $rta .= '<tr><td>No hay operaciones para esta orden.</td></tr>';
 		}
@@ -180,3 +146,19 @@ function commerce_todo_pago_admin_form($form, &$form_state,$order = false) {
 	}
 }
 
+function printGetStatus($arrayResult, $indent = 0) {
+	$rta = '';
+	foreach ($arrayResult as $key => $value) {
+	    if ($key !== 'nil' && $key !== "@attributes") {
+			if (is_array($value) ){
+			    $rta .= "<tr>";
+			    $rta .= "<td>".str_repeat("-", $indent) . "<strong>$key:</strong></td>";
+			    $rta .= "<td>".printGetStatus($value, $indent + 2)."</td>";
+			    $rta .= "</tr>";
+			} else {
+			    $rta .= "<tr><td>".str_repeat("-", $indent) . "<strong>$key:</strong></td><td> $value </td></tr>";
+			}
+	    }
+	}
+	return $rta;
+}
