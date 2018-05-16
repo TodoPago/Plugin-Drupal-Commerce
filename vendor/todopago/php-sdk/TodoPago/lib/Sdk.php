@@ -9,8 +9,8 @@ define('TODOPAGO_ENDPOINT_PROD','https://apis.todopago.com.ar/');
 define('TODOPAGO_ENDPOINT_TENATN', 't/1.1/');
 define('TODOPAGO_ENDPOINT_SOAP_APPEND', 'services/');
 
-define('TODOPAGO_ENDPOINT_TEST_FORM','https://developers.todopago.com.ar/resources/TPHybridForm-v0.1.js');
-define('TODOPAGO_ENDPOINT_PROD_FORM','https://forms.todopago.com.ar/resources/TPHybridForm-v0.1.js');
+define('TODOPAGO_ENDPOINT_TEST_FORM','https://developers.todopago.com.ar/resources/v2/TPBSAForm.min.js');
+define('TODOPAGO_ENDPOINT_PROD_FORM','https://forms.todopago.com.ar/resources/v2/TPBSAForm.min.js');
 
 define('TODOPAGO_WSDL_AUTHORIZE', dirname(__FILE__).'/Authorize.wsdl');
 
@@ -76,6 +76,7 @@ class Sdk
 
 	public function setGoogleClient(\TodoPago\Client\Google $client) {
 		$this->gClient = $client;
+		$this->gClient->setProxyParameters($this->host,$this->port,$this->user,$this->pass);
 		$this->gClient->setKey($this->end_point);
 	}
 
@@ -386,6 +387,12 @@ class Sdk
 
 	public function getByRangeDateTime($arr_datos) {
 		if(!isset($arr_datos['PAGENUMBER'])) $arr_datos['PAGENUMBER'] = 1;
+		if($arr_datos["STARTDATE"] instanceof \DateTime) {
+		   $arr_datos["STARTDATE"] = url_encode($arr_datos["STARTDATE"]->format("Y-m-dTH:i:s"));
+                }
+		if($arr_datos["ENDDATE"] instanceof \DateTime) {
+		   $arr_datos["ENDDATE"] = url_encode($arr_datos["ENDDATE"]->format("Y-m-dTH:i:s"));
+                }
 		$url = $this->end_point.TODOPAGO_ENDPOINT_TENATN.'api/Operations/GetByRangeDateTime/MERCHANT/'. $arr_datos["MERCHANT"] . '/STARTDATE/' . $arr_datos["STARTDATE"] . '/ENDDATE/' . $arr_datos["ENDDATE"] . '/PAGENUMBER/' . $arr_datos["PAGENUMBER"];
 		return $this->doRest($url);
 	}
@@ -427,7 +434,11 @@ class Sdk
 			curl_setopt($curl, CURLOPT_PROXY, $this->host);
 		if($this->port != null)
 			curl_setopt($curl, CURLOPT_PROXYPORT, $this->port);
-		
+		if($this->user != null) {
+			curl_setopt($curl, CURLOPT_PROXYAUTH, CURLAUTH_ANY);
+			curl_setopt($curl, CURLOPT_PROXYUSERPWD, $this->user.':'.$this->pass);
+		}
+
 		$result = curl_exec($curl);
 		$http_status = curl_getinfo($curl, CURLINFO_HTTP_CODE);
 

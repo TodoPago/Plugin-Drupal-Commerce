@@ -10,16 +10,23 @@ class Google
     private $address;
     private $gAddress;
 
+        private $host = NULL;
+        private $port = NULL;
+        private $user = NULL;
+        private $pass = NULL;
+
     private $provinciaCode = array(
         "CABA" => "C",
         "Buenos Aires" => "B",
         "Córdoba" => "X",
+        "Cordoba" => "X",
         "Santa Fe" => "S",
         "Santa Cruz" => "Z",
         "San Juan" => "J",
         "La Rioja" => "F",
         "La Pampa" => "L",
         "Entre Ríos" => "E",
+        "Entre Rios" => "E",
         "Catamarca" => "K",
         "Chaco" => "H",
         "Chubut" => "U",
@@ -28,14 +35,25 @@ class Google
         "Jujuy" => "Y",
         "Mendoza" => "M",
         "Misiónes" => "N",
+        "Misiones" => "N",
         "Neuquén" => "Q",
+        "Neuquen" => "Q",
         "Río Negro" => "R",
+        "Rio Negro" => "R",
         "Salta" => "A",
         "San Luis" => "D",
         "Santiago del Estero" => "G",
         "Tierra del Fuego" => "V",
-        "Tucumán" => "T"
+        "Tucumán" => "T",
+        "Tucuman" => "T"
     );
+
+    public function setProxyParameters($host = null, $port = null, $user = null, $pass = null){
+    	$this->host = $host;
+       	$this->port = $port;
+        $this->user = $user;
+        $this->pass = $pass;
+    }
 
     public function setKey($mode) {
         if($mode == TODOPAGO_ENDPOINT_PROD) {
@@ -132,7 +150,16 @@ class Google
         curl_setopt($curl, CURLOPT_RETURNTRANSFER, 1);
         curl_setopt($curl, CURLOPT_SSL_VERIFYPEER, false);
         curl_setopt($curl, CURLOPT_SSL_VERIFYHOST, false);
-        
+
+                if($this->host != null)
+                        curl_setopt($curl, CURLOPT_PROXY, $this->host);
+                if($this->port != null)
+                        curl_setopt($curl, CURLOPT_PROXYPORT, $this->port);
+               if($this->user != null) {
+                        curl_setopt($curl, CURLOPT_PROXYAUTH, CURLAUTH_ANY);
+                        curl_setopt($curl, CURLOPT_PROXYUSERPWD, $this->user.':'.$this->pass);
+                }
+
         $result = curl_exec($curl);
         $http_status = curl_getinfo($curl, CURLINFO_HTTP_CODE);
 

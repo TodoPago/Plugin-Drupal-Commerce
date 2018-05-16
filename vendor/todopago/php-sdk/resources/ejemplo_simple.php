@@ -26,8 +26,13 @@ $optionsSAR_operacion = array (
 	'OPERATIONID'=>"50",
 	'CURRENCYCODE'=> 032,
 	'AMOUNT'=>"54",
+
+	// PARAMETROS OPCIONALES.
 	'MININSTALLMENTS' => 3, //Nro minimo de cuotas a mostrar en el formulario, OPCIONAL.
 	'MAXINSTALLMENTS' => 8, //Nro maximo de cuotas a mostrar en el formulario, OPCIONAL.
+	'AVAILABLEPAYMENTMETHODSIDS' => "1#42#500", //Filtro de Medios de Pago. OPCIONAL.
+        'TIMEOUT' => 30*60*1000, //Tiempo de vida de la tansaccion. OPCIONAL.
+
 	//Datos ejemplos CS
 	'CSBTCITY'=> "Villa General Belgrano",
 	'CSSTCITY'=> "Villa General Belgrano",
@@ -145,3 +150,8 @@ $u1->setPassword("Password");
 //ejecuto los métodos
 $rta = $connector->getCredentials($u1);
 var_dump($rta);
+
+
+// DISCOVER PAYMENT METHODS
+$rtaDiscover = $connector->discoverPaymentMethods();
+var_dump($rtaDiscover);

@@ -489,6 +489,47 @@ function commerce_todo_pago_transaction_confirm_access($order, $transaction = NU
 }
 
 
+function getGithubVersion()
+{
+  $headers = ["Authorization: token 21600a0757d4b32418c54e3833dd9d47f78186b4"];
+
+    $ch = curl_init(); 
+    curl_setopt($ch, CURLOPT_URL, 'https://api.github.com/repos/TodoPago/Plugin-Drupal-Commerce/releases/latest'); 
+    curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1; SV1)');
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, 0);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 0);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+    $output = curl_exec($ch); 
+    curl_close($ch);
+
+    $result = (array) json_decode($output);
+
+    return str_ireplace("v", "", $result['tag_name']); 
+ }
+
+ function needUpdatePlugin($tpGithubVersion, $installedVersion)
+ {
+    $return = 0;
+    $a = explode('.', $tpGithubVersion);
+    $b = explode('.', $installedVersion);
+         
+    foreach ( $a as $i => $val ) {
+        if (($val && !$b[$i] && intval($val) > 0) || ( intval($val) > intval($b[$i])) ) {
+            $return = 1;
+            break;
+        } else if (($b[$i] && !$val && intval($b[$i]) > 0) || (intval($val) < intval($b[$i]))) {
+            $return = -1;
+           break;
+       }
+    }
+    return $return;
+
+}
+
+
+
+
 function commerce_todo_pago_settings_form($settings = NULL) {
 
   $form = array();
@@ -506,9 +547,27 @@ function commerce_todo_pago_settings_form($settings = NULL) {
     drupal_get_path('module', 'commerce_todo_pago') . '/includes/tp-styles.css',
   );
 
+
+  $tpGithubVersion = getGithubVersion(); 
+  $installedVersion = TP_PLUGIN_VERSION;
+
+
+  $update_message = '';
+  $need_update_plugin = needUpdatePlugin($tpGithubVersion, $installedVersion);
+
+  if ($need_update_plugin && $need_update_plugin==1){
+    $update_message = '<p style="color:green">Se encuentra disponible una versión más reciente del plugin de Todo Pago, puede consultarla desde <a href="https://github.com/TodoPago/Plugin-Drupal-Commerce" >aquí</a></p>';
+  }
+
   $form['commerce_todo_pago_help_text'] = array(
-    '#markup' => '<div class="help">' . t('<p><strong>v1.8.0</strong></p><h4><strong>Instrucciones de uso</strong></h4><p>Complete los campos con los valores provistos por Todo Pago</p>') . '</div>', 
+    '#markup' => '<div class="help">' . 
+      t("<p><strong>v".TP_PLUGIN_VERSION."</strong>{$update_message}</p>
+      <h4><strong>Instrucciones de uso</strong></h4>
+      <p>Complete los campos con los valores provistos por Todo Pago</p>") .
+      '</div>', 
   );
+
+
 
   $form['general'] = array(
     '#type' => 'fieldset',

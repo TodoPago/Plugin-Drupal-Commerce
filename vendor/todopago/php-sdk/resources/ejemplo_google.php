@@ -82,6 +82,8 @@ $optionsSAR_operacion = array (
     );
 
 $g = new \TodoPago\Client\Google();
+$g->setProxyParameters("proxy.visa2.com.ar",8080,"user","password");
+
 $connector->setGoogleClient($g);
 
 $rta = $connector->sendAuthorizeRequest($optionsSAR_comercio, $optionsSAR_operacion);

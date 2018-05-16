@@ -5,7 +5,7 @@ include_once(drupal_get_path('module', 'commerce_todo_pago').'/includes/ControlF
 include_once(drupal_get_path('module', 'commerce_todo_pago').'/includes/Logger/logger.php');
 
 include_once(drupal_get_path('module', 'commerce_todo_pago').'/vendor/autoload.php');
-define('TP_PLUGIN_VERSION',"1.8.0");
+define('TP_PLUGIN_VERSION',"1.9.0");
 function TPLog($order = null, $user = null, $endpoint = null) {
 
 	$logger = new TodoPagoLogger();
@@ -233,6 +233,8 @@ function call_SAR($connector, $order, $optionsSAR_comercio, $optionsSAR_operacio
 		$modo = "test";
 	}
 
+
+
 	if ($rta['StatusCode']  != -1)//Si la transacción salió mal
 	{
 		if(($rta['StatusCode']  == 702)&&(!property_exists($order,"first_step"))) {
@@ -259,8 +261,15 @@ function call_SAR($connector, $order, $optionsSAR_comercio, $optionsSAR_operacio
 				'#weight' => 50,
 		);
 	} else {
+
+
 		$form['iframe'] = array(
-			'#markup' => '<iframe src="' . base_path() . drupal_get_path('module', 'commerce_todo_pago') .'/includes/formcustom.php?modo='.$modo.'&amount='.$optionsSAR_operacion["AMOUNT"].'&merchant='.$optionsSAR_operacion["MERCHANT"].'&prk=' . $rta['PublicRequestKey'] . '&order=' . $order->order_id . '&key='.$order->data['payment_redirect_key'].'" name="formcustom" scrolling="no" frameborder="0" width="490px" height="900px"></iframe>'
+			'#markup' => '<iframe src="' . base_path() . drupal_get_path('module', 'commerce_todo_pago') .'/includes/formcustom.php?modo='.$modo.'&amount='.$optionsSAR_operacion["AMOUNT"].'&merchant='.$optionsSAR_operacion["MERCHANT"].'&prk=' . $rta['PublicRequestKey'] . 
+			    '&order=' . $order->order_id . 
+			    '&completename=' . $optionsSAR_operacion['CSSTFIRSTNAME'] .' '.$optionsSAR_operacion['CSSTLASTNAME'].
+			    '&mail=' . $optionsSAR_operacion['CSBTEMAIL'] . 
+			    '&key='.$order->data['payment_redirect_key'].
+			    '" name="formcustom" scrolling="no" frameborder="0" width="100%" height="1500"></iframe>'
         );
 	}
 	return $form;

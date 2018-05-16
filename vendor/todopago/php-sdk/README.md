@@ -12,15 +12,16 @@ Todo Pago - módulo SDK-PHP para conexión con gateway de pago
       + [Diagrama de secuencia](#secuencia)
       + [Solicitud de autorización](#solicitudautorizacion)
       + [Datos adicionales para prevención de fraude](#datosadicionales)
-      + [Direcciones con formato de Google Maps](#gmaps)
       + [Opciones adicionales](#opcionesadicionales)
         + [Rango de cuotas](#coutas)
+        + [Filtrado de Medios de pago](#filtromp)
         + [Tiempo de vida de la transacción](#timeout)
       + [Confirmación de transacción](#confirmatransaccion)
       + [Ejemplo](#ejemplo)
       + [Características](#caracteristicas)
         + [Status de la operación](#status)
         + [Consulta de operaciones por rango de tiempo](#statusdate)
+        + [Descubrimiento de Medios de Pago](#discover)
         + [Devolución](#devolucion)
         + [Devolución parcial](#devolucionparcial)
         + [Formulario híbrido](#formhidrido)
@@ -102,8 +103,7 @@ Una vez adheridos se creará automáticamente una cuenta virtual, en la cual se 
 
 <a name="secuencia"></a>
 ## Diagrama de secuencia
-![imagen de configuracion](https://raw.githubusercontent.com/TodoPago/imagenes/master/README.img/secuencia-page-001.jpg)
-
+![imagen de configuracion](https://raw.githubusercontent.com/TodoPago/imagenes/master/README.img/secuencia-003.jpg)
 
 
 <a name="solicitudautorizacion"></a>
@@ -657,28 +657,6 @@ $optionsSAR_operacion = array(
 [<sub>Volver a inicio</sub>](#inicio)
 <br>
 
-<a name="gmaps"></a>
-## Direcciones con formato de Google Maps
-Se proveé una extensión para formatear las direcciones de facturación y envío con la API de Google Maps. Su uso es opcional pero al utilizar este formato se mejora la detección de fraude y se recomienda activarlo.
-
-Para su uso se debe instanciar la clase Google y setear en el conector. De esta manera al invocar al servicio SendAuthorizeRequest se formatearan las direcciones con la API de Google Maps.
-
-El ejemplo de su uso es el siguiente:
-
-```php
-$g = new \TodoPago\Client\Google();
-$connector->setGoogleClient($g);
-
-// (...) invocacion estandar al SAR
-$rta = $connector->sendAuthorizeRequest($optionsSAR_comercio, $optionsSAR_operacion);
-
-
-// (...) se puede obtener la respuesta de la API
-print_r($connector->getGoogleClient()->getGoogleResponse());
-print_r($connector->getGoogleClient()->getOriginalAddress());
-print_r($connector->getGoogleClient()->getFinalAddress());
-```
-
 <a name="opcionesadicionales"></a>
 #### Opciones adicionales
 Dentro del parámetro *$optionsSAR_operacion* pueden enviarse opciones adicionales que habilitan características para esa transacción en particular. A continuación se describen las mismas
@@ -711,6 +689,49 @@ Es posible setear el rango de cuotas a mostrar en el formulario entre un mínimo
   </tr>  
 </table>
 
+##### Ejemplo
+
+```php
+$optionsSAR_operacion = array (
+...................................
+	'MININSTALLMENTS'=>3,
+	'MAXINSTALLMENTS'=>6,
+...................................
+```
+
+<a name="filtromp"></a>
+##### Filtrado de Medios de Pago
+Mediante esta funcionalidad es posible filtrar los medios de pago habilitados en el formulario de pago. Se debe pasar en la llamada al servicio SendAuthorizeRequest un parámetro adicional con los ids de los medio de pago que se desean habilitar, los cuales pueden consultarse mediante el método de [Descubrimiento de Medios de Pago](#discover)
+
+<table>
+  <tr>
+    <th>Campo</th>
+    <th>Requerido</th>
+    <th>Descripción</th>
+    <th>Tipo de Dato</th>
+    <th>Valores posibles / Ejemplo</th>
+  </tr>
+  <tr>
+    <td><b>AVAILABLEPAYMENTMETHODSIDS</b></td>
+    <td>No</td>
+    <td>Lista de los ids de medios de pago habilitados separados por #</td>
+    <td>Alfanumérico</td>
+    <td>1#42#500</td>
+  </tr>
+</table>
+
+##### Ejemplo
+
+```php
+$optionsSAR_operacion = array (
+...................................
+	'AVAILABLEPAYMENTMETHODSIDS'=>"1#42#500",
+...................................
+```
+
+[<sub>Volver a inicio</sub>](#inicio)
+<br>
+
 <a name="timeout"></a>
 ##### Tiempo de vida de la transacción
 Es posible setear el tiempo máximo disponible para que el cliente complete el pago en el formulario, el valor por defecto es de 30 minutos. El rango posible es de 5 minutos a 6 horas. Los valores deben ser expresados en milisegundos
@@ -732,8 +753,17 @@ Es posible setear el tiempo máximo disponible para que el cliente complete el p
   </tr>
 </table>
 
+##### Ejemplo
+
+```php
+$optionsSAR_operacion = array (
+...................................
+	'TIMEOUT'=> 10*60*1000, // 10 minutos
+...................................
+```
+
 [<sub>Volver a inicio</sub>](#inicio)
-<br>
+
 <a name="confirmatransaccion"></a>
 #### Confirmación de transacción.
 En este caso hay que llamar a **getAuthorizeAnswer()**, enviando como parámetro un array como se describe a continuación.
@@ -817,6 +847,8 @@ El campo o elemento Payload es utilizado para retornar los datos de la respuesta
 <tr><td>**AUTHORIZATIONCODE**</td><td>No</td><td>Código de Autorización</td><td>Alfanumérico de hasta 8 caracteres</td><td>Ejemplo: "014158"</td></tr>
 <tr><td>**INSTALLMENTPAYMENTS**</td><td>No</td><td>Cantidad de cuotas elegidas para la operación</td><td>Numérico</td><td> Ejemplo: 03</td></tr>
 <tr><td>**AMOUNTBUYER**</td><td>Si</td><td>Monto final (incluyendo Costo Financiero) pagado por el comprador</td><td>Decimal</td><td> Ejemplo: 129.68</td></tr>
+<tr><td>**CFT**</td><td>Si</td><td>CFT de la promoción aplicada.</td><td>Decimal</td><td> Ejemplo: 0.00</td></tr>
+<tr><td>**TEA**</td><td>Si</td><td>TEA de la promoción aplicada.</td><td>Decimal</td><td> Ejemplo: 22.00</td></tr>
 </table>
 
 .
@@ -841,7 +873,9 @@ array(
           'TICKETNUMBER'           => '12',
           'CARDNUMBERVISIBLE'      => '450799******4905',
           'AUTHORIZATIONCODE'      => 'TEST38',
-	  'INSTALLMENTPAYMENTS'    => '5'
+	  'INSTALLMENTPAYMENTS'    => '5',
+	  'CFT' 		   => '0.00',
+	  'TEA'			   => '22.00'
       ),
       'Request' =>
         array (
@@ -873,6 +907,9 @@ También disponemos de un ejemplo más completo que simula una orden en un e-com
 
 <a name="status"></a>
 #### Status de la Operación
+
+![estado](https://raw.githubusercontent.com/TodoPago/imagenes/master/README.img/secuencia-status.jpg)
+
 El SDK cuenta con un método para consultar el status de la transacción de forma on-line, con los siguientes datos:
 
 <table>
@@ -1009,19 +1046,125 @@ Usando el punto como separador de decimales. No se permiten comas, ni como separ
     <td>Ejemplo: "450799XXXXXX0010"</td>
   </tr>
   <tr>
-  <td><b>TITULAR</b></td>
+  <td><b>CARDHOLDERNAME</b></td>
   <td>No</td>
   <td>Nombre del titular de la tarjeta.</td>
   <td>Alfanumérico</td>
   <td>Ejemplo: "Juan Pérez"</td>
   </tr>
   <tr>
-    <td><b>NROTICKET</b></td>
+    <td><b>TICKETNUMBER</b></td>
     <td>No</td>
     <td>Número de Ticket o Voucher</td>
     <td>Numérico de Hasta 4 dígitos</td>
     <td>Ejemplo: 7509</td>
   </tr>
+  <tr>
+    <td><b>AUTHORIZATIONCODE</b></td>
+    <td>Si</td>
+    <td>Código de autorización</td>
+    <td>Numérico</td>
+    <td>Ejemplo: 109345</td>
+  </tr>
+	
+  <tr>
+    <td><b>CFT</b></td>
+    <td>Si</td>
+    <td>CFT de la promoción aplicada</td>
+    <td>Decimal</td>
+    <td>Ejemplo: 0.00</td>
+  </tr>
+  <tr>
+    <td><b>TEA</b></td>
+    <td>Si</td>
+    <td>TEA de la promoción aplicada</td>
+    <td>Decimal</td>
+    <td>Ejemplo: 22.00</td>
+  </tr>
+  <tr>
+    <td><b>FEEAMOUNT</b></td>
+    <td>Si</td>
+    <td>Comisión por la transacción</td>
+    <td>Decimal</td>
+    <td>Ejemplo: 22.00</td>
+  </tr>
+  <tr>
+    <td><b>TAXAMOUNT</b></td>
+    <td>Si</td>
+    <td>Retenciones de impuestos</td>
+    <td>Decimal</td>
+    <td>Ejemplo: 22.00</td>
+  </tr>
+  <tr>
+    <td><b>SERVICECHAGEAMOUNT</b></td>
+    <td>Si</td>
+    <td>Costo del servicio</td>
+    <td>Decimal</td>
+    <td>Ejemplo: 22.00</td>
+  </tr>
+  <tr>
+    <td><b>CREDITEDAMOUNT</b></td>
+    <td>Si</td>
+    <td>Monto neto acreditado</td>
+    <td>Decimal</td>
+    <td>Ejemplo: 22.00</td>
+  </tr>
+  <tr>
+    <td><b>FEEAMOUNT</b></td>
+    <td>Si</td>
+    <td>Comisión por la transacción</td>
+    <td>Decimal</td>
+    <td>Ejemplo: 22.00</td>
+  </tr>
+  <tr>
+    <td><b>RELEASESTATUS</b></td>
+    <td>Si</td>
+    <td>Estado de la transacción</td>
+    <td>Alfanumérico</td>
+    <td>Ejemplo: TX_APROBADA</td>
+  </tr>
+  <tr>
+    <td><b>RELEASEDATETIME</b></td>
+    <td>Si</td>
+    <td>Fecha de disponibilización de la transacción</td>
+    <td>Datetime</td>
+    <td>Ejemplo: 2017-11-28T11:24:11</td>
+  </tr>
+  <tr>
+    <td><b>PHONENUMBER</b></td>
+    <td>Si</td>
+    <td>Número de teléfono de facturación</td>
+    <td>Alfanumérico</td>
+    <td>Ejemplo: 541152528100</td>
+  </tr>
+  <tr>
+    <td><b>ADDRESS</b></td>
+    <td>Si</td>
+    <td>Dirección de facturación</td>
+    <td>Alfanumérico</td>
+    <td>Ejemplo: Callao 78</td>
+  </tr>  
+  <tr>
+    <td><b>POSTALCODE</b></td>
+    <td>Si</td>
+    <td>Código postal de facturación</td>
+    <td>Alfanumérico</td>
+    <td>Ejemplo: C1430DRW</td>
+  </tr>  
+  <tr>
+    <td><b>REFUNDS</b></td>
+    <td>Si</td>
+    <td>Listado de devoluciones realizadas sobre la transacción</td>
+    <td>Array</td>
+    <td>-</td>
+  </tr>  
+  <tr>
+    <td><b>ITEMS</b></td>
+    <td>Si</td>
+    <td>Listado de items de la compra</td>
+    <td>Array</td>
+    <td>&lt;code&gt;Camisetas&lt;/code&gt; &lt;description&gt;Fashion lleva diseando colecciones increbles desde&lt;/description&gt; &lt;name&gt;Camiseta efecto desteido de manga corta&lt;/name&gt; &lt;price&gt;19.98&lt;/price&gt; &lt;quantity&gt;1&lt;/quantity&gt; &lt;sku&gt;demo1&lt;/sku&gt; &lt;totalAmount&gt;19.98&lt;/totalAmount&gt;</td>
+  </tr>    
 </table>
 
 <ins><strong>Ejemplo de Respuesta</strong></ins>
@@ -1049,6 +1192,10 @@ array (size=1)
       'COUPONEXPDATE' => null
       'COUPONSECEXPDATE' => null
       'COUPONSUBSCRIBER' => null
+      'TEA' => string '22.00' (length=5)
+      'CFT' => string '0.00' (length=4)
+      'RELEASESTATUS' => string 'TX_RECHAZADA' (length=11)
+      'RELEASEDATETIME' => null
 ```
 
 Además, se puede conocer el estado de las transacciones a través del portal [www.todopago.com.ar](http://www.todopago.com.ar/). Desde el portal se verán los estados "Aprobada" y "Rechazada". Si el método de pago elegido por el comprador fue Pago Fácil o RapiPago, se podrán ver en estado "Pendiente" hasta que el mismo sea pagado.
@@ -1078,8 +1225,22 @@ $client->getByRangeDateTime(array('MERCHANT'=>'12305', "STARTDATE" => $date1, "E
 ```
 La respuesta será similar al [GetStatus](#status), pero con hasta 5 operaciones.
 
+<a name="discover"></a>
+#### Descubrimiento de Medios de Pago
+
+![medios de pago](https://raw.githubusercontent.com/TodoPago/imagenes/master/README.img/secuencia-paymentmethods.jpg)
+
+La SDK cuenta con un método para obtener todos los medios de pago habilitados en TodoPago.
+
+```php
+$client = new TodoPago\Sdk($http_header, $mode);
+$rta = $client->discoverPaymentMethods();
+```
+
 <a name="devolucion"></a>
 #### Devolución
+
+![devolucion parcial](https://raw.githubusercontent.com/TodoPago/imagenes/master/README.img/secuencia-devolucion-total.jpg)
 
 El SDK dispone de métodos para realizar la devolución, de una transacción realizada a traves de TodoPago.
 
@@ -1132,12 +1293,14 @@ array(
 	"StatusMessage" => "Operación realizada correctamente",
 );
 ```
-<br>
-
 <a name="devolucionparcial"></a>
 #### Devolución parcial
 
+![devolucion parcial](https://raw.githubusercontent.com/TodoPago/imagenes/master/README.img/secuencia-devolucion-parcial.jpg)
+
 El SDK dispone de métodos para realizar la devolución parcial, de una transacción realizada a traves de TodoPago.
+
+_Nota: Para el caso de promociones con costo financiero, se deberá enviar el monto a devolver en base al valor original de la transacción y no del monto finalmente cobrado. TodoPago se encargará de devolver el porcentaje del costo financiero correspondiente a la devolución parcial._
 
 Se debe llamar al método ```returnRequest``` de la siguiente manera:
 
@@ -1191,26 +1354,21 @@ array(
 	"StatusMessage" => "Operación realizada correctamente",
 );
 ```
-<br>
+
+
 <a name="formhidrido"></a>
+
 #### Formulario híbrido
 
 **Conceptos básicos**<br>
-El formulario híbrido es una alternativa al medio de pago actual por redirección al formulario externo de TodoPago.<br>
+El formulario híbrido, es una alternativa al medio de pago actual por redirección al formulario externo de TodoPago.<br>
 Con el mismo, se busca que el comercio pueda adecuar el look and feel del formulario a su propio diseño.
 
-**Librería**<br>
+**Librería**
 El formulario requiere incluir en la página una librería Javascript de TodoPago.<br>
 El endpoint depende del entorno:
-+ Desarrollo: https://developers.todopago.com.ar/resources/TPHybridForm-v0.1.js
-+ Produccion: https://forms.todopago.com.ar/resources/TPHybridForm-v0.1.js
-
-También se provee un método en el SDK para obtener el endpoint de la librería Javascript:
-
-```php
-$sdk = new \TodoPago\Sdk($http_header, $mode);
-$js = $sdk->getEndpointForm();
-```
++ Desarrollo: https://developers.todopago.com.ar/resources/v2/TPBSAForm.min.js
++ Producción: https://forms.todopago.com.ar/resources/v2/TPBSAForm.min.js
 
 **Restricciones y libertades en la implementación**
 
@@ -1231,55 +1389,54 @@ El formulario implementado debe contar al menos con los siguientes campos.
 
 ```html
 <body>
-	<select id="formaDePagoCbx"></select>
-	<select id="bancoCbx"></select>
-	<select id="promosCbx"></select>
-
-    <!-- Para los casos en el que el comercio opera con PEI -->
-        <label id="labelPeiCheckboxId"></label>
-    	<input id="peiCbx"/>
-    <!-- -->
-	<label id="labelPromotionTextId"></label>
-	<input id="numeroTarjetaTxt"/>
-	<input id="mesTxt"/>
-	<input id="anioTxt"/>
-	<input id="codigoSeguridadTxt"/>
-	<label id="labelCodSegTextId"></label>
-	<input id="apynTxt"/>
-	<select id="tipoDocCbx"></select>
-	<input id="nroDocTxt"/>
-	<input id="emailTxt"/><br/>
-
-    <!-- Para los casos en el que el comercio opera con PEI -->
-	    <label id="labelPeiTokenTextId"></label>
-	    <input id="peiTokenTxt"/>
-    <!-- -->
-
-        <button id="MY_btnPagarConBilletera"/>
-	<button id="MY_btnConfirmarPago"/>
+  <select id="formaPagoCbx"></select>
+  <input id="numeroTarjetaTxt"/>
+  <label id="numeroTarjetaLbl"></label>
+  <select id="medioPagoCbx"></select>
+  <select id="bancoCbx"></select>
+  <select id="promosCbx"></select>
+  <label id="promosLbl"></label>
+  <label id="peiLbl"></label>
+  <input id="peiCbx"/>
+  <select id="mesCbx"></select>
+  <select id="anioCbx"></select>
+  <label id="fechaLbl"></label>
+  <input id="codigoSeguridadTxt"/>
+  <label id="codigoSeguridadLbl"></label>
+  <input id="nombreTxt"/>
+  <select id="tipoDocCbx"></select>
+  <input id="nroDocTxt"/>
+  <input id="emailTxt"/>
+  <label id="tokenPeiLbl"></label>
+  <input id="tokenPeiTxt"/>
+  <button id="MY_btnConfirmarPago"/>
+  <button id="MY_btnPagarConBilletera"/>
 </body>
 ```
 
-**Inizialización y parametros requeridos**<br>
-Para inicializar el formulario se usa window.TPFORMAPI.hybridForm.initForm. El cual permite setear los elementos e ids requeridos.
+**Inizialización y parámetros requeridos**<br>
+Para inicializar el formulario se usa window.TPFORMAPI.hybridForm.initForm. El cual permite setear los elementos y ids requeridos.
 
-Para inicializar un ítem de pago, es necesario llamar a window.TPFORMAPI.hybridForm.setItem. Éste requiere obligatoriamente el parámetro publicKey que corresponde al PublicRequestKey (entregado por el SAR).
-Se sugiere agregar los parámetros usuario, e-mail, tipo de documento y número.
+Para inicializar un ítem de pago, es necesario llamar a window.TPFORMAPI.hybridForm.setItem. Este requiere obligatoriamente el parámetro publicKey que corresponde al PublicRequestKey (entregado por el SAR).
+Se sugiere agregar los parámetros usuario, e-mail, tipo de documento y numero.
 
 **Javascript**
 ```js
+/************* CONFIGURACION DEL API ***********************/
 window.TPFORMAPI.hybridForm.initForm({
-    callbackValidationErrorFunction: 'validationCollector',
-	callbackCustomSuccessFunction: 'customPaymentSuccessResponse',
-	callbackCustomErrorFunction: 'customPaymentErrorResponse',
-        callbackBilleteraFunction: 'billeteraPaymentResponse',
-	botonPagarId: 'MY_btnConfirmarPago',
-	modalCssClass: 'modal-class',
-	modalContentCssClass: 'modal-content',
-	beforeRequest: 'initLoading',
-	afterRequest: 'stopLoading'
+callbackValidationErrorFunction: 'validationCollector',
+callbackBilleteraFunction: 'billeteraPaymentResponse',
+callbackCustomSuccessFunction: 'customPaymentSuccessResponse',
+callbackCustomErrorFunction: 'customPaymentErrorResponse',
+botonPagarId: 'MY_btnConfirmarPago',
+botonPagarConBilleteraId: 'MY_btnPagarConBilletera',
+modalCssClass: 'modal-class',
+modalContentCssClass: 'modal-content',
+beforeRequest: 'initLoading',
+afterRequest: 'stopLoading'
 });
 
+/************* SETEO UN ITEM PARA COMPRAR ******************/
 window.TPFORMAPI.hybridForm.setItem({
     publicKey: 'taf08222e-7b32-63d4-d0a6-5cabedrb5782', //obligatorio
     defaultNombreApellido: 'Usuario',
@@ -1288,35 +1445,43 @@ window.TPFORMAPI.hybridForm.setItem({
     defaultTipoDoc: 'DNI'
 });
 
-//callbacks de respuesta del pago
+/************* FUNCIONES CALLBACKS *************************/
 function validationCollector(parametros) {
+console.log("My validation collector callback");
+console.log(parametros.field + " -> " + parametros.error);
 }
 function billeteraPaymentResponse(response) {
+console.log("My billetera payment callback");
+console.log(response.ResultCode + " -> " +response.ResultMessage);
 }
 function customPaymentSuccessResponse(response) {
+console.log("My custom payment success callback");
+console.log(response.ResultCode + " -> " +response.ResultMessage);
 }
 function customPaymentErrorResponse(response) {
+console.log("My custom payment error callback");
+console.log(response.ResultCode + " -> " +response.ResultMessage);
 }
 function initLoading() {
+console.log('Loading...');
 }
 function stopLoading() {
+console.log('Stop loading...');
 }
+
 ```
 
 **Callbacks**<br>
 El formulario define callbacks javascript, que son llamados según el estado y la información del pago realizado:
-+ billeteraPaymentResponse: Devuelve response si el pago se realizó con Billetera.
-+ customPaymentSuccessResponse: Devuelve response si el pago se realizó correctamente.
-+ customPaymentErrorResponse: Si hubo algun error durante el proceso de pago, este devuelve el response con el código y mensaje correspondiente.
-
-**Ejemplo de Implementación**:
-<a href="/resources/form_hibrido-ejemplo/index.html" target="blank">Formulario híbrido</a>
-<br>
-
++ billeteraPaymentResponse: Devuelve response si el pago con billetera se realizó correctamente.
++ customPaymentSuccessResponse: Devuelve response si el pago se realizo correctamente.
++ customPaymentErrorResponse: Si hubo algún error durante el proceso de pago, este devuelve el response con el código y mensaje correspondiente.
 [<sub>Volver a inicio</sub>](#inicio)
 
 <a name="credenciales"></a>
 #### Obtener credenciales
+![credenciales](https://raw.githubusercontent.com/TodoPago/imagenes/master/README.img/secuencia-credenciales.jpg)
+
 El SDK permite obtener las credenciales "Authentification", "MerchandId" y "Security" de la cuenta de Todo Pago, ingresando el usuario y contraseña.<br>
 Esta funcionalidad es útil para obtener los parámetros de configuración dentro de la implementación.
 
@@ -1399,7 +1564,7 @@ $rta->getApikey();
 
 <table>
 <tr><th>Id mensaje</th><th>Mensaje</th></tr>
-<tr><td>-1</td><td>Aprobada.</td></tr>
+<tr><td>-1</td><td>Tu compra fue exitosa.</td></tr>
 <tr><td>1081</td><td>Tu saldo es insuficiente para realizar la transacción.</td></tr>
 <tr><td>1100</td><td>El monto ingresado es menor al mínimo permitido</td></tr>
 <tr><td>1101</td><td>El monto ingresado supera el máximo permitido.</td></tr>
@@ -1419,16 +1584,21 @@ $rta->getApikey();
 <tr><td>90000</td><td>La cuenta destino de los fondos es inválida. Verificá la información ingresada en Mi Perfil.</td></tr>
 <tr><td>90001</td><td>La cuenta ingresada no pertenece al CUIT/ CUIL registrado.</td></tr>
 <tr><td>90002</td><td>No pudimos validar tu CUIT/CUIL.  Comunicate con nosotros <a href="#contacto" target="_blank">acá</a> para más información.</td></tr>
+<tr><td>99005</td><td>Tu compra no pudo realizarse. Iniciala nuevamente.</td></tr>
 <tr><td>99900</td><td>El pago fue realizado exitosamente</td></tr>
 <tr><td>99901</td><td>No hemos encontrado tarjetas vinculadas a tu Billetera. Podés  adherir medios de pago desde www.todopago.com.ar</td></tr>
 <tr><td>99902</td><td>No se encontro el medio de pago seleccionado</td></tr>
 <tr><td>99903</td><td>Lo sentimos, hubo un error al procesar la operación. Por favor reintentá más tarde.</td></tr>
+<tr><td>99904</td><td>Tu compra no puede ser realizada. Comunicate con tu vendedor.</td></tr>
+<tr><td>99953</td><td>Tu compra no pudo realizarse. Iniciala nuevamente o utilizá otro medio de pago.</td></tr>
+<tr><td>99960</td><td>Esta compra requiere autorización de VISA. Comunicate al número que se encuentra al dorso de tu tarjeta.</td></tr>
+<tr><td>99961</td><td>Esta compra requiere autorización de AMEX. Comunicate al número que se encuentra al dorso de tu tarjeta.</td></tr>
 <tr><td>99970</td><td>Lo sentimos, no pudimos procesar la operación. Por favor reintentá más tarde.</td></tr>
 <tr><td>99971</td><td>Lo sentimos, no pudimos procesar la operación. Por favor reintentá más tarde.</td></tr>
 <tr><td>99978</td><td>Lo sentimos, no pudimos procesar la operación. Por favor reintentá más tarde.</td></tr>
 <tr><td>99979</td><td>Lo sentimos, el pago no pudo ser procesado.</td></tr>
 <tr><td>99980</td><td>Ya realizaste un pago en este sitio por el mismo importe. Si querés realizarlo nuevamente esperá 5 minutos.</td></tr>
-<tr><td>99982</td><td>En este momento la operación no puede ser realizada. Por favor intentá más tarde.</td></tr>
+<tr><td>99982</td><td>Tu compra no pudo ser procesada. Iniciala nuevamente utilizando otro medio de pago.</td></tr>
 <tr><td>99983</td><td>Lo sentimos, el medio de pago no permite la cantidad de cuotas ingresadas. Por favor intentá más tarde.</td></tr>
 <tr><td>99984</td><td>Lo sentimos, el medio de pago seleccionado no opera en cuotas.</td></tr>
 <tr><td>99985</td><td>Lo sentimos, el pago no pudo ser procesado.</td></tr>
@@ -1440,7 +1610,7 @@ $rta->getApikey();
 <tr><td>99991</td><td>Los datos informados son incorrectos. Por favor ingresalos nuevamente.</td></tr>
 <tr><td>99992</td><td>La fecha de vencimiento es incorrecta. Por favor seleccioná otro medio de pago o actualizá los datos.</td></tr>
 <tr><td>99993</td><td>La tarjeta ingresada no está vigente. Por favor seleccioná otra tarjeta o actualizá los datos.</td></tr>
-<tr><td>99994</td><td>El saldo de tu tarjeta no te permite realizar esta operacion.</td></tr>
+<tr><td>99994</td><td>El saldo de tu tarjeta no te permite realizar esta compra. Iniciala nuevamente utilizando otro medio de pago.</td></tr>
 <tr><td>99995</td><td>La tarjeta ingresada es invalida. Seleccioná otra tarjeta para realizar el pago.</td></tr>
 <tr><td>99996</td><td>La operación fué rechazada por el medio de pago porque el monto ingresado es inválido.</td></tr>
 <tr><td>99997</td><td>Lo sentimos, en este momento la operación no puede ser realizada. Por favor intentá más tarde.</td></tr>
